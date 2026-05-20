@@ -1,34 +1,187 @@
-/* Risk card colour states */
-.risk-card { background: #f1f5f9; color: #0f172a; }
-.risk-good { background: linear-gradient(135deg,#15803d,#22c55e); color:#fff; }
-.risk-warn { background: linear-gradient(135deg,#b45309,#f59e0b); color:#fff; }
-.risk-bad  { background: linear-gradient(135deg,#991b1b,#ef4444); color:#fff; }
-.risk-okay { background: linear-gradient(135deg,#0369a1,#0ea5e9); color:#fff; }
-
-/* Input row */
-.field { display:grid; grid-template-columns: 1fr auto; align-items:center; gap: .5rem .75rem; }
-.field > label { font-size: .8rem; color: #475569; }
-.field > .control { display:flex; align-items:center; gap:.5rem; justify-self:end; }
-.field input[type="number"], .field input[type="text"], .field select {
-  width: 9.5rem; padding: .35rem .55rem; border:1px solid #cbd5e1; border-radius:.5rem;
-  background:#fff; font-variant-numeric: tabular-nums; text-align:right;
+/* ── Darnell Consulting brand ───────────────────────────── */
+:root {
+  --cream:  #FAF7F0;
+  --navy:   #1B2A4E;
+  --gold:   #C9A961;
+  --gold2:  #A8813D;
+  --ink:    #1e293b;
+  --muted:  #64748b;
+  --border: #e2e8f0;
+  --surface:#ffffff;
+  --radius: .75rem;
 }
-.field input[type="checkbox"]{ width:1rem; height:1rem; }
-.field .suffix { font-size:.75rem; color:#64748b; min-width: 1.5rem; text-align:left; }
 
-/* Slider rows */
-.slider-row { display:grid; grid-template-columns: 1fr; gap:.25rem; }
-.slider-row .lbl { display:flex; justify-content:space-between; font-size:.8rem; color:#475569; }
-.slider-row .lbl b { color:#0f172a; font-variant-numeric: tabular-nums; }
-.slider-row input[type="range"]{ width:100%; }
+/* ── Reset / base ────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body { background: var(--cream); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; }
 
-/* Sectioned subhead */
-.subhead { font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; color:#64748b; margin-top:.25rem; }
+/* ── Header ──────────────────────────────────────────────── */
+header { background: var(--navy); color: #fff; }
+header .logo { font-size: 1.6rem; }
+header h1   { font-family: 'Playfair Display', Georgia, serif; font-size: 1.5rem; font-weight: 700; letter-spacing: -.01em; }
+header p    { color: rgba(255,255,255,.65); font-size: .85rem; }
+.header-actions button {
+  padding: .4rem .85rem;
+  border-radius: .4rem;
+  font-size: .8rem;
+  border: 1px solid rgba(255,255,255,.25);
+  background: rgba(255,255,255,.1);
+  color: #fff;
+  cursor: pointer;
+  transition: background .15s;
+}
+.header-actions button:hover { background: rgba(255,255,255,.2); }
+.header-actions .btn-gold {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--navy);
+  font-weight: 600;
+}
+.header-actions .btn-gold:hover { background: var(--gold2); border-color: var(--gold2); }
 
-/* Tiny helper text */
-.help { font-size:.7rem; color:#64748b; }
+/* ── Scenario tabs ───────────────────────────────────────── */
+#scenarioTabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: 1rem;
+}
+.scenario-tab {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .4rem .75rem;
+  border-radius: 2rem;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: .8rem;
+  transition: border-color .15s, box-shadow .15s;
+  user-select: none;
+}
+.scenario-tab.active {
+  border-color: var(--sc-color, var(--navy));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sc-color, var(--navy)) 20%, transparent);
+  font-weight: 600;
+}
+.sc-dot  { width: .65rem; height: .65rem; border-radius: 50%; flex-shrink: 0; }
+.sc-vis, .sc-remove {
+  background: none; border: none; cursor: pointer; font-size: .85rem; line-height: 1; padding: 0 .1rem; opacity: .6;
+}
+.sc-vis:hover, .sc-remove:hover { opacity: 1; }
+.scenario-add {
+  padding: .4rem .75rem;
+  border-radius: 2rem;
+  border: 1.5px dashed var(--gold);
+  background: transparent;
+  color: var(--gold2);
+  font-size: .8rem;
+  cursor: pointer;
+  font-weight: 500;
+}
+.scenario-add:hover { background: rgba(201,169,97,.08); }
 
-/* No spinner-arrow clutter on number inputs */
+/* ── Sequencing toggle ───────────────────────────────────── */
+.seq-btn {
+  padding: .35rem .8rem;
+  border-radius: .4rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: .78rem;
+  cursor: pointer;
+}
+.seq-btn.active { border-color: #dc2626; color: #dc2626; background: #fef2f2; }
+
+/* ── Risk / headline cards ───────────────────────────────── */
+.risk-card  { background: #f1f5f9; color: var(--ink); }
+.risk-good  { background: linear-gradient(135deg,#15803d,#22c55e); color:#fff; }
+.risk-warn  { background: linear-gradient(135deg,#b45309,#f59e0b); color:#fff; }
+.risk-bad   { background: linear-gradient(135deg,#991b1b,#ef4444); color:#fff; }
+.risk-okay  { background: linear-gradient(135deg,#0369a1,#0ea5e9); color:#fff; }
+
+/* ── Input fields ────────────────────────────────────────── */
+.field { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .4rem .75rem; }
+.field > label { font-size: .8rem; color: var(--muted); }
+.field > .control { display: flex; align-items: center; gap: .4rem; justify-self: end; }
+.field input[type="number"],
+.field input[type="text"],
+.field select {
+  width: 9.5rem;
+  padding: .35rem .55rem;
+  border: 1px solid var(--border);
+  border-radius: .5rem;
+  background: var(--cream);
+  font-size: .85rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ink);
+  transition: border-color .15s;
+}
+.field input:focus, .field select:focus {
+  outline: none;
+  border-color: var(--navy);
+  box-shadow: 0 0 0 2px rgba(27,42,78,.12);
+}
+.field input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: var(--navy); }
+.field .suffix { font-size: .75rem; color: var(--muted); min-width: 1.5rem; text-align: left; }
 input[type=number]::-webkit-outer-spin-button,
-input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 input[type=number] { -moz-appearance: textfield; }
+
+/* ── Section subhead ─────────────────────────────────────── */
+.subhead {
+  font-size: .68rem;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--gold2);
+  font-weight: 600;
+  margin-top: .5rem;
+  border-bottom: 1px solid rgba(201,169,97,.25);
+  padding-bottom: .2rem;
+}
+
+/* ── Help text ───────────────────────────────────────────── */
+.help { font-size: .7rem; color: var(--muted); line-height: 1.5; }
+
+/* ── Details/summary collapsible ─────────────────────────── */
+details > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: .75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(27,42,78,.04);
+  font-weight: 600;
+  font-size: .9rem;
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+details > summary::-webkit-details-marker { display: none; }
+details > summary .chevron { transition: transform .2s; color: var(--muted); font-size: .8rem; }
+details[open] > summary .chevron { transform: rotate(180deg); }
+details > .section-body { padding: 1.25rem; display: flex; flex-direction: column; gap: .6rem; }
+
+/* ── Key metrics strip ───────────────────────────────────── */
+.metric-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.metric-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.metric-value { font-size: 1.25rem; font-weight: 700; color: var(--ink); margin-top: .15rem; }
+
+/* ── Pension explainer table ─────────────────────────────── */
+.pension-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 640px) { .pension-grid { grid-template-columns: 1fr; } }
+
+/* ── Chart legend dots ───────────────────────────────────── */
+.legend-dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; vertical-align: middle; margin-right: .3rem; }
+
+/* ── Utilities ───────────────────────────────────────────── */
+.text-gold  { color: var(--gold2); }
+.text-navy  { color: var(--navy); }
+.divider    { border: none; border-top: 1px solid var(--border); margin: .5rem 0; }
