@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Freedom Gap Calculator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%B0%3C/text%3E%3C/svg%3E" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="styles.css" />
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink: { 950: '#0b1220', 900: '#0f172a', 800: '#1e293b', 700: '#334155' },
+          good: '#16a34a',
+          warn: '#f59e0b',
+          bad:  '#dc2626',
+          accent: '#0ea5e9',
+        }
+      }
+    }
+  }
+</script>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased">
+
+<header class="bg-ink-950 text-white">
+  <div class="max-w-7xl mx-auto px-4 py-5 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-xl sm:text-2xl font-semibold tracking-tight">Freedom Gap Calculator</h1>
+      <p class="text-slate-300 text-sm">When does your wealth run out? Plan with confidence.</p>
+    </div>
+    <div class="flex items-center gap-2 text-xs">
+      <button id="resetBtn" class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20">Reset</button>
+      <button id="exampleBtn" class="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20">Load example</button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 py-6">
+
+  <!-- HEADLINE OUTPUTS -->
+  <section id="headline" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div id="riskCard" class="risk-card rounded-2xl shadow-sm p-6 col-span-1 md:col-span-1 transition-colors">
+      <div class="text-xs font-medium opacity-80 uppercase tracking-wide">Your wealth becomes at risk at age</div>
+      <div class="mt-1 flex items-baseline gap-2">
+        <div id="riskAge" class="text-6xl sm:text-7xl font-bold leading-none">—</div>
+        <div id="riskLabel" class="text-sm font-medium opacity-90"></div>
+      </div>
+      <div id="riskSubtext" class="mt-2 text-sm opacity-90"></div>
+    </div>
+
+    <div class="rounded-2xl bg-white shadow-sm p-6">
+      <div class="text-xs font-medium text-slate-500 uppercase tracking-wide">Funding gap at retirement</div>
+      <div id="gapAmount" class="mt-1 text-3xl font-bold">—</div>
+      <div class="mt-3 text-sm text-slate-600 grid grid-cols-2 gap-2">
+        <div><span class="text-slate-500">Balance:</span> <span id="balAmount" class="font-medium">—</span></div>
+        <div><span class="text-slate-500">Target:</span> <span id="targetAmount" class="font-medium">—</span></div>
+      </div>
+    </div>
+
+    <div class="rounded-2xl bg-white shadow-sm p-6">
+      <div class="text-xs font-medium text-slate-500 uppercase tracking-wide">Age Pension</div>
+      <div class="mt-1 flex items-baseline gap-2">
+        <div id="pensionStartAge" class="text-3xl font-bold">—</div>
+        <div id="pensionStatus" class="text-sm font-medium text-slate-600"></div>
+      </div>
+      <div id="pensionDetail" class="mt-2 text-sm text-slate-600"></div>
+    </div>
+  </section>
+
+  <!-- CHART -->
+  <section class="rounded-2xl bg-white shadow-sm p-4 sm:p-6 mb-6">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+      <h2 class="text-lg font-semibold">Portfolio balance by age</h2>
+      <div class="text-xs text-slate-500">
+        <span class="inline-block w-3 h-3 rounded-sm align-middle mr-1" style="background:#0ea5e9"></span>Combined wealth
+        <span class="inline-block w-3 h-3 rounded-sm align-middle ml-3 mr-1" style="background:#94a3b8"></span>Target
+        <span class="inline-block w-3 h-3 rounded-sm align-middle ml-3 mr-1" style="background:#f59e0b"></span>Part-pension zone
+        <span class="inline-block w-3 h-3 rounded-sm align-middle ml-3 mr-1" style="background:#dc2626"></span>Depletion
+      </div>
+    </div>
+    <div class="relative h-72 sm:h-96">
+      <canvas id="wealthChart"></canvas>
+    </div>
+  </section>
+
+  <!-- KEY METRICS STRIP -->
+  <section class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    <div class="rounded-xl bg-white shadow-sm p-4">
+      <div class="text-xs text-slate-500 uppercase tracking-wide">Years until joint retirement</div>
+      <div id="yearsToRet" class="text-xl font-semibold">—</div>
+    </div>
+    <div class="rounded-xl bg-white shadow-sm p-4">
+      <div class="text-xs text-slate-500 uppercase tracking-wide">Retirement years funded</div>
+      <div id="yearsFunded" class="text-xl font-semibold">—</div>
+    </div>
+    <div class="rounded-xl bg-white shadow-sm p-4">
+      <div class="text-xs text-slate-500 uppercase tracking-wide">Annual gap to bridge</div>
+      <div id="annualGap" class="text-xl font-semibold">—</div>
+    </div>
+    <div class="rounded-xl bg-white shadow-sm p-4">
+      <div class="text-xs text-slate-500 uppercase tracking-wide">Safe to earn (on pension)</div>
+      <div id="safeEarn" class="text-xl font-semibold">—</div>
+      <div class="text-[11px] text-slate-500 mt-0.5">combined / year from employment</div>
+    </div>
+  </section>
+
+  <!-- INPUTS -->
+  <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+    <!-- Client 1 -->
+    <details class="group rounded-2xl bg-white shadow-sm overflow-hidden" open>
+      <summary class="cursor-pointer select-none px-5 py-3 flex items-center justify-between bg-slate-100 hover:bg-slate-200">
+        <span class="font-semibold">Client 1</span>
+        <span class="text-slate-400 group-open:rotate-180 transition-transform">⌄</span>
+      </summary>
+      <div class="p-5 space-y-3" data-client="0"></div>
+    </details>
+
+    <!-- Client 2 -->
+    <details class="group rounded-2xl bg-white shadow-sm overflow-hidden" open>
+      <summary class="cursor-pointer select-none px-5 py-3 flex items-center justify-between bg-slate-100 hover:bg-slate-200">
+        <span class="font-semibold">Client 2</span>
+        <span class="text-slate-400 group-open:rotate-180 transition-transform">⌄</span>
+      </summary>
+      <div class="p-5 space-y-3" data-client="1"></div>
+    </details>
+
+    <!-- Shared assumptions -->
+    <details class="group rounded-2xl bg-white shadow-sm overflow-hidden" open>
+      <summary class="cursor-pointer select-none px-5 py-3 flex items-center justify-between bg-slate-100 hover:bg-slate-200">
+        <span class="font-semibold">Shared assumptions</span>
+        <span class="text-slate-400 group-open:rotate-180 transition-transform">⌄</span>
+      </summary>
+      <div class="p-5 space-y-3" id="sharedInputs"></div>
+    </details>
+
+    <!-- Debt -->
+    <details class="group rounded-2xl bg-white shadow-sm overflow-hidden">
+      <summary class="cursor-pointer select-none px-5 py-3 flex items-center justify-between bg-slate-100 hover:bg-slate-200">
+        <span class="font-semibold">Debt</span>
+        <span class="text-slate-400 group-open:rotate-180 transition-transform">⌄</span>
+      </summary>
+      <div class="p-5 space-y-3" id="debtInputs"></div>
+    </details>
+
+    <!-- Inheritance -->
+    <details class="group rounded-2xl bg-white shadow-sm overflow-hidden">
+      <summary class="cursor-pointer select-none px-5 py-3 flex items-center justify-between bg-slate-100 hover:bg-slate-200">
+        <span class="font-semibold">Inheritance</span>
+        <span class="text-slate-400 group-open:rotate-180 transition-transform">⌄</span>
+      </summary>
+      <div class="p-5 space-y-3" id="inheritanceInputs"></div>
+    </details>
+
+    <!-- Pension -->
+    <details class="group rounded-2xl bg-white shadow-sm overflow-hidden">
+      <summary class="cursor-pointer select-none px-5 py-3 flex items-center justify-between bg-slate-100 hover:bg-slate-200">
+        <span class="font-semibold">Age Pension settings</span>
+        <span class="text-slate-400 group-open:rotate-180 transition-transform">⌄</span>
+      </summary>
+      <div class="p-5 space-y-3" id="pensionInputs"></div>
+    </details>
+
+  </section>
+
+  <!-- PENSION EXPLAINER -->
+  <section id="pensionExplain" class="mt-6 rounded-2xl bg-white shadow-sm p-5 sm:p-6">
+    <h2 class="text-lg font-semibold mb-2">How the Age Pension fits in</h2>
+    <div class="grid md:grid-cols-2 gap-4 text-sm text-slate-700">
+      <div>
+        <div class="font-medium text-slate-900 mb-1">Asset test (couple, combined)</div>
+        <ul class="space-y-1">
+          <li><span class="text-slate-500">Full pension under:</span> <span id="ap_full" class="font-medium"></span></li>
+          <li><span class="text-slate-500">Cuts out above:</span> <span id="ap_cut" class="font-medium"></span></li>
+          <li><span class="text-slate-500">Taper:</span> $3/fortnight per $1,000 over the threshold</li>
+        </ul>
+      </div>
+      <div>
+        <div class="font-medium text-slate-900 mb-1">Income test &amp; Work Bonus</div>
+        <ul class="space-y-1">
+          <li><span class="text-slate-500">Income free area (couple):</span> $380/fortnight</li>
+          <li><span class="text-slate-500">Work Bonus:</span> $300/fortnight each from employment ignored</li>
+          <li><span class="text-slate-500">Deemed income:</span> 1.25% under $106,200 / 3.25% above</li>
+        </ul>
+      </div>
+    </div>
+    <p class="text-xs text-slate-500 mt-3">Figures current as at 20 March 2026 (Services Australia). Rates are indexed twice yearly.</p>
+  </section>
+
+  <!-- DISCLAIMER -->
+  <section class="mt-6 text-xs text-slate-500 leading-relaxed max-w-4xl">
+    <p><strong>Disclaimer:</strong> Projections illustrate outcomes calculated from the inputs and assumptions you provide. They are not a guarantee of future performance. Changes to tax, superannuation or social security law, investment returns and other events will produce a different outcome. This tool is for general information only and is not personal financial product advice.</p>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
