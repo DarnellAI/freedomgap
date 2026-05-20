@@ -94,6 +94,11 @@ export function runProjection(params, applySequencing = false) {
         const addCC = Math.min(cli.additionalConcessional ?? 0, SUPER.concessionalCap);
         const acc   = accumStep(st.accum, salary, s.sgcRate ?? 0.12, addCC, returnRate);
         st.accum    = acc.closing;
+        // Grow any pension balance received via survivor transfer while still working
+        if (st.pension > 0) {
+          const p = pensionCompound(st.pension, returnRate);
+          st.pension = p.closing;
+        }
 
         // Downsizer: applied at freedom year if active and eligible
         const nextAge = st.age + 1;
@@ -126,9 +131,10 @@ export function runProjection(params, applySequencing = false) {
     }
 
     // ── Inheritance ────────────────────────────────────────────────────────────
-    if (inh.amount > 0 && cs[0].age === inh.ageReceived) {
+    // Trigger based on calendar year (t), not cs[0].age — cs[0] may die before ageReceived
+    const inhTriggerYear = inh.ageReceived - c[0].currentAge + 1;
+    if (inh.amount > 0 && t === inhTriggerYear) {
       if (drawdownStarted) {
-        // During retirement, add directly to the combined pool
         combinedBal += inh.amount;
       } else if (inh.destination === 'super') {
         const toSuper  = Math.min(inh.amount, SUPER.nccAnnual);
@@ -226,26 +232,23 @@ export function runProjection(params, applySequencing = false) {
         }
       }
 
-      // Min drawdown enforcement (track but apply via combined pool)
+      // Min drawdown enforcement
       const oldestAliveAge = Math.max(...cs.filter(s => s.alive).map(s => s.age));
       const minDraw = minDrawdownAmount(pensionBal, oldestAliveAge);
       const netDraw = Math.max(0, desiredNominal - pensionIncome);
-      const actualDraw = Math.max(netDraw, minDraw);
-      row.minDrawdown = minDraw;
-
-      // If min drawdown exceeds desired, excess stays in pool (or routes to non-super per setting)
+      // Excess min draw above income needs is reinvested (stays in pool as non-super savings)
       const excessMinDraw = Math.max(0, minDraw - netDraw);
-      if (excessMinDraw > 0 && s.minDrawdownExcess === 'super') {
-        // Notional: excess stays in pool, would normally go to non-super as NCC — treat as stays in pool
-      }
+      const effectiveDraw = netDraw;  // pool only loses what's actually consumed for living
+      row.minDrawdown = minDraw;
+      row.excessMinDraw = excessMinDraw;
 
       const grossReturn = combinedBal * returnRate;
-      const newBal      = combinedBal + grossReturn - actualDraw;
+      const newBal      = combinedBal + grossReturn - effectiveDraw;
 
       row.dd              = drawdownYear;
       row.startBalance    = combinedBal;
       row.pensionIncome   = pensionIncome;
-      row.drawdownDraw    = actualDraw;
+      row.drawdownDraw    = effectiveDraw;
       row.grossReturn     = grossReturn;
       row.endBalance      = Math.max(0, newBal);
 
