@@ -2,11 +2,46 @@
 
 let chartInstance = null;
 
+// Draws the depletion marker as a canvas overlay rather than a data spike,
+// so it never inflates the y-axis scale.
+const depletionPlugin = {
+  id: 'depletionMarker',
+  afterDraw(chart) {
+    const idx = chart._depletionIdx;
+    if (idx == null || idx < 0) return;
+    const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+    const xPos = x.getPixelForTick(idx);
+    if (!xPos) return;
+    ctx.save();
+    // Dashed vertical line
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 4]);
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(xPos, top);
+    ctx.lineTo(xPos, bottom);
+    ctx.stroke();
+    // Solid downward triangle at the top of the line
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#dc2626';
+    ctx.beginPath();
+    ctx.moveTo(xPos - 7, top + 1);
+    ctx.lineTo(xPos + 7, top + 1);
+    ctx.lineTo(xPos, top + 13);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  },
+};
+
 export function initChart(canvasId) {
   const ctx = document.getElementById(canvasId).getContext('2d');
   chartInstance = new Chart(ctx, {
     type: 'line',
     data: { labels: [], datasets: [] },
+    plugins: [depletionPlugin],
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -53,7 +88,6 @@ function fmtM(v) {
 /**
  * Rebuild chart with all scenario results.
  * @param {Array<{scenario, result, sequencingResult?}>} scenarioResults
- * @param {number} startAge - Older client's age today (x-axis anchor)
  */
 export function updateChart(scenarioResults) {
   if (!chartInstance) return;
@@ -110,14 +144,8 @@ export function updateChart(scenarioResults) {
       });
     }
 
-    // Target / required lump sum line (first scenario only)
+    // Required balance reference line (first scenario only)
     if (datasets.length <= 2 && result.requiredLump > 0 && result.freedomAge) {
-      const targetData = ages.map(age => {
-        if (age < result.freedomAge) return null;
-        // Declines at desired income rate post-freedom
-        return null; // simplified: just a horizontal reference at freedomAge
-      });
-      // Draw a simple horizontal target line at freedom age
       const retirementRow = result.rows.find(r => r.retirementStart);
       if (retirementRow) {
         const flatTarget = ages.map(age => age < result.freedomAge ? null : result.requiredLump);
@@ -136,28 +164,12 @@ export function updateChart(scenarioResults) {
     }
   }
 
-  // Depletion vertical line
+  // Depletion marker: stored on the instance and drawn by depletionPlugin.
+  // Using a canvas overlay (not a data point) so it never inflates the y-axis.
   const firstResult = scenarioResults[0]?.result;
-  if (firstResult?.depletionAge) {
-    const deplIdx = ages.indexOf(firstResult.depletionAge);
-    if (deplIdx >= 0) {
-      // Create a tall single-point spike at depletion age
-      const depData = ages.map((_, i) => (i === deplIdx ? 2e7 : null));
-      datasets.push({
-        label: 'Depletion',
-        data: depData,
-        borderColor: '#dc2626',
-        backgroundColor: '#dc262640',
-        fill: false,
-        pointRadius: 4,
-        pointStyle: 'triangle',
-        pointBackgroundColor: '#dc2626',
-        borderWidth: 0,
-        tension: 0,
-        spanGaps: false,
-      });
-    }
-  }
+  chartInstance._depletionIdx = firstResult?.depletionAge
+    ? ages.indexOf(firstResult.depletionAge)
+    : -1;
 
   chartInstance.data.labels   = labels;
   chartInstance.data.datasets = datasets;

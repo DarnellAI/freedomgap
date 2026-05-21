@@ -146,7 +146,19 @@ function renderClientInputs(idx, state, onChange) {
   if (!container) return;
   container.innerHTML = '';
 
-  function up(key, val) { cli[key] = val; onChange(); }
+  // Sync section header with client name
+  const details = container.closest('details');
+  const headerSpan = details?.querySelector('summary > span:first-child');
+  if (headerSpan) headerSpan.textContent = cli.name || `Client ${idx + 1}`;
+
+  function up(key, val) {
+    cli[key] = val;
+    // Update header immediately on name change (recalc doesn't re-render inputs)
+    if (key === 'name' && headerSpan) {
+      headerSpan.textContent = val || `Client ${idx + 1}`;
+    }
+    onChange();
+  }
   function upDz(key, val) { cli.downsizer[key] = val; onChange(); }
 
   const rows = [
