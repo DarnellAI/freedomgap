@@ -106,16 +106,25 @@ export function updateChart(scenarioResults) {
   const ages = [...allAges].sort((a, b) => a - b);
 
   // Dual-age x-axis labels: show both clients' ages at each tick (e.g. "72/71")
-  const firstRes = scenarioResults[0]?.result;
+  // When birth dates are provided the ages are fractional (e.g. "65.6/64.2")
+  const firstRes    = scenarioResults[0]?.result;
   const c0Start     = firstRes?.clientStartAges?.[0];
   const c1Start     = firstRes?.clientStartAges?.[1];
   const youngerStart = firstRes?.youngerStart;
-  const labels = (c0Start != null && c1Start != null && youngerStart != null)
+  const frac0       = firstRes?.fractionalStartAges?.[0];
+  const frac1       = firstRes?.fractionalStartAges?.[1];
+  const hasFrac     = frac0 != null && frac1 != null && youngerStart != null;
+  const labels = hasFrac
     ? ages.map(age => {
         const off = age - youngerStart;
-        return `${c0Start + off}/${c1Start + off}`;
+        return `${(frac0 + off).toFixed(1)}/${(frac1 + off).toFixed(1)}`;
       })
-    : ages.map(String);
+    : (c0Start != null && c1Start != null && youngerStart != null)
+      ? ages.map(age => {
+          const off = age - youngerStart;
+          return `${c0Start + off}/${c1Start + off}`;
+        })
+      : ages.map(String);
 
   const datasets = [];
 
@@ -284,9 +293,13 @@ export function updateDebtChart(scenarioResults) {
   const dc0Start = result.clientStartAges?.[0];
   const dc1Start = result.clientStartAges?.[1];
   const dYounger = result.youngerStart;
-  debtChartInstance.data.labels = (dc0Start != null && dc1Start != null && dYounger != null)
-    ? ages.map(age => { const off = age - dYounger; return `${dc0Start + off}/${dc1Start + off}`; })
-    : ages.map(String);
+  const df0 = result.fractionalStartAges?.[0];
+  const df1 = result.fractionalStartAges?.[1];
+  debtChartInstance.data.labels = (df0 != null && df1 != null && dYounger != null)
+    ? ages.map(age => { const off = age - dYounger; return `${(df0 + off).toFixed(1)}/${(df1 + off).toFixed(1)}`; })
+    : (dc0Start != null && dc1Start != null && dYounger != null)
+      ? ages.map(age => { const off = age - dYounger; return `${dc0Start + off}/${dc1Start + off}`; })
+      : ages.map(String);
   debtChartInstance.data.datasets = datasets;
   debtChartInstance.update('none');
   updateDebtLegend(result.debtNames);

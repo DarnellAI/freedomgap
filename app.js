@@ -9,6 +9,15 @@ import {
   renderScenarioTabs, renderSequencingToggle,
 } from './ui/scenarios.js';
 
+// ── Fractional age from birth date + plan date ─────────────────────────────────
+function computeFractionalAge(birthYear, birthMonth, planDateStr) {
+  if (!birthYear || !birthMonth) return null;
+  const today = planDateStr ? new Date(planDateStr + 'T00:00:00') : new Date();
+  const birth = new Date(birthYear, birthMonth - 1, 1);
+  if (isNaN(birth.getTime()) || isNaN(today.getTime())) return null;
+  return (today - birth) / (365.25 * 24 * 60 * 60 * 1000);
+}
+
 // ── State migration (old single-debt format → debts array) ────────────────────
 function migrateState(state) {
   if (state.debt !== undefined && !state.debts) {
@@ -35,6 +44,12 @@ function migrateState(state) {
   if (!state.agedCare)  state.agedCare  = { active: false, amount: 500000, triggerAge: 85, mode: 'invested' };
   if (!state.pension)   state.pension   = { include: true, homeowner: true, pensionAge: 67 };
   if (!state.inheritance) state.inheritance = { amount: 0, ageReceived: 75, destination: 'nonSuper', applyToDebtFirst: false };
+  // Birth date and plan date (added for fractional age display)
+  state.clients.forEach(cl => {
+    if (cl.birthYear  === undefined) cl.birthYear  = null;
+    if (cl.birthMonth === undefined) cl.birthMonth = null;
+  });
+  if (state.shared.planDate === undefined) state.shared.planDate = null;
   return state;
 }
 
@@ -51,8 +66,16 @@ function recalc() {
   const results = [];
   for (const sc of scenarios) {
     if (!sc.visible) continue;
-    const result = runProjection(sc.state);
+    const result    = runProjection(sc.state);
     const seqResult = sc.showSequencing ? runProjection(sc.state, true) : null;
+    // Attach fractional ages for chart label display
+    const pd = sc.state.shared.planDate;
+    const f0 = computeFractionalAge(sc.state.clients[0].birthYear, sc.state.clients[0].birthMonth, pd);
+    const f1 = computeFractionalAge(sc.state.clients[1].birthYear, sc.state.clients[1].birthMonth, pd);
+    if (f0 != null && f1 != null) {
+      result.fractionalStartAges = [f0, f1];
+      if (seqResult) seqResult.fractionalStartAges = [f0, f1];
+    }
     results.push({ scenario: sc, result, sequencingResult: seqResult });
   }
 

@@ -108,6 +108,7 @@ header p    { color: rgba(255,255,255,.65); font-size: .85rem; }
 .field > .control { display: flex; align-items: center; gap: .4rem; justify-self: end; justify-content: flex-end; }
 .field input[type="number"],
 .field input[type="text"],
+.field input[type="date"],
 .field select {
   width: 9.5rem;
   padding: .35rem .55rem;

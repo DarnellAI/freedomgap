@@ -81,6 +81,8 @@ export const DEFAULT_STATE = {
       superBalance: 350000,
       additionalConcessional: 0,
       downsizer: { active: false, amount: 0 },
+      birthYear: null,
+      birthMonth: null,
     },
     {
       name: 'Client 2',
@@ -94,6 +96,8 @@ export const DEFAULT_STATE = {
       superBalance: 250000,
       additionalConcessional: 0,
       downsizer: { active: false, amount: 0 },
+      birthYear: null,
+      birthMonth: null,
     },
   ],
   shared: {
@@ -104,6 +108,7 @@ export const DEFAULT_STATE = {
     incomePhases: [{ income: 100000, untilAge: null }],
     planToAge: 95,
     minDrawdownExcess: 'invest',
+    planDate: null,
   },
   debts: [],
   inheritance: {

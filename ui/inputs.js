@@ -123,6 +123,14 @@ function textInput(value, onInput) {
   return inp;
 }
 
+function dateInput(value, onInput) {
+  const inp = document.createElement('input');
+  inp.type = 'date';
+  inp.value = value ?? '';
+  inp.addEventListener('input', () => onInput(inp.value || null));
+  return inp;
+}
+
 /**
  * Render all input sections into their containers.
  * @param {object} state   - Full state object (mutated in-place by controls)
@@ -161,10 +169,19 @@ function renderClientInputs(idx, state, onChange) {
   }
   function upDz(key, val) { cli.downsizer[key] = val; onChange(); }
 
+  const MONTHS = [
+    ['','—'],['1','Jan'],['2','Feb'],['3','Mar'],['4','Apr'],
+    ['5','May'],['6','Jun'],['7','Jul'],['8','Aug'],
+    ['9','Sep'],['10','Oct'],['11','Nov'],['12','Dec'],
+  ];
+
   const rows = [
     makeRow('Name (report display)',              textInput(cli.name, v => up('name', v))),
     makeRow('Gender (life expectancy default)',   selectInput([['male','Male'],['female','Female']], cli.gender, v => up('gender', v))),
     makeRow('Current age (today)',               ageInput(cli.currentAge, v => up('currentAge', v)), 'yrs'),
+    subhead('Date of birth — enables fractional ages on charts'),
+    makeRow('Birth month', selectInput(MONTHS, cli.birthMonth?.toString() ?? '', v => up('birthMonth', v ? parseInt(v, 10) : null))),
+    makeRow('Birth year',  numInput(cli.birthYear ?? new Date().getFullYear() - 50, v => up('birthYear', v || null), 1920, new Date().getFullYear() - 18, 1)),
     makeRow('Life expectancy (planning horizon, not a medical prediction)', ageInput(cli.lifeExpectancy, v => up('lifeExpectancy', v)), 'yrs'),
     subhead('Income — gross, before tax. Employer super is paid on top.'),
     makeRow('Full-time income (gross, before tax)',  numInput(cli.ftIncome, v => up('ftIncome', v)), '$/yr'),
@@ -309,7 +326,9 @@ function renderSharedInputs(state, onChange) {
   const sgcRow = makeRow('SGC rate (employer super, legislated 12% from Jul 2025)', pctInput(s.sgcRate, v => up('sgcRate', v)), '%');
   sgcRow.dataset.field = 'sgc';
 
+  const todayDefault = new Date().toISOString().slice(0, 10);
   const rows = [
+    makeRow("Plan date (today's date for this projection)", dateInput(s.planDate ?? todayDefault, v => up('planDate', v || null))),
     makeRow('Return profile (expected net annual portfolio return)', selectInput(profileOptions, s.returnProfile, v => up('returnProfile', v))),
     sgcRow,
     makeRow('Non-super savings (cash, ETFs, investment property equity, etc.)', numInput(s.nonSuper, v => up('nonSuper', v)), '$'),
