@@ -36,6 +36,7 @@ export function runProjection(params, applySequencing = false) {
   const jointFreedom = Math.max(c[0].freedomAge, c[1].freedomAge);
   const olderStart   = Math.min(c[0].currentAge, c[1].currentAge);
   const totalYears   = Math.max(55, (s.planToAge ?? 95) - olderStart + 5);
+  const planYears    = Math.max(1, (s.planToAge ?? 95) - jointFreedom);
 
   // Per-client mutable state
   const cs = c.map(x => ({
@@ -100,9 +101,8 @@ export function runProjection(params, applySequencing = false) {
           st.pension = p.closing;
         }
 
-        // Downsizer: applied at freedom year if active and eligible
-        const nextAge = st.age + 1;
-        if (nextAge >= cli.freedomAge && !st.atFreedom) {
+        // Downsizer: applied when client reaches their freedom age
+        if (st.age >= cli.freedomAge && !st.atFreedom) {
           // Downsizer contribution before converting to pension
           if (cli.downsizer?.active && st.age >= 55) {
             const dsAmount = Math.min(cli.downsizer.amount ?? 0, SUPER.downsizer.maxPerPerson);
@@ -262,7 +262,7 @@ export function runProjection(params, applySequencing = false) {
       if (!depleted) lastPositiveAge = currentAge;
       if (depleted && depletionAge === null) depletionAge = lastPositiveAge ?? currentAge;
 
-      if (newBal >= desiredNominal * (1 + INFLATION)) yearsFullyFunded++;
+      if (drawdownYear <= planYears && newBal >= desiredNominal * (1 + INFLATION)) yearsFullyFunded++;
 
       combinedBal   = Math.max(0, newBal);
       row.totalWealth = combinedBal + (agedCareBal ?? 0);
@@ -275,7 +275,6 @@ export function runProjection(params, applySequencing = false) {
   }
 
   // Summary outputs
-  const planYears        = Math.max(1, (s.planToAge ?? 95) - jointFreedom);
   const requiredLump     = requiredBalance(s.desiredIncome, returnRate, planYears);
   const retirementBalance = retirementCombined > 0 ? retirementCombined : (cs.reduce((sum, st) => sum + (st.freedomBalance ?? 0), 0) + (s.nonSuper ?? 0));
 
