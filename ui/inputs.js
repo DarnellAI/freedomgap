@@ -57,6 +57,17 @@ function numInput(value, onInput, min = 0, max = 999999999, step = 1) {
   return inp;
 }
 
+function yearInput(value, onInput) {
+  const inp = document.createElement('input');
+  inp.type  = 'number';
+  inp.value = value ?? '';
+  inp.min   = 1920;
+  inp.max   = new Date().getFullYear();
+  inp.step  = 1;
+  inp.addEventListener('input', () => onInput(parseInt(inp.value, 10) || null));
+  return inp;
+}
+
 function ageInput(value, onInput) {
   const inp = document.createElement('input');
   inp.type = 'number';
@@ -202,7 +213,7 @@ function renderClientInputs(idx, state, onChange) {
     makeRow('Current age (today)',               ageInput(cli.currentAge, v => up('currentAge', v)), 'yrs'),
     subhead('Date of birth — enables fractional ages on charts'),
     makeRow('Birth month', selectInput(MONTHS, cli.birthMonth?.toString() ?? '', v => up('birthMonth', v ? parseInt(v, 10) : null))),
-    makeRow('Birth year',  numInput(cli.birthYear ?? new Date().getFullYear() - 50, v => up('birthYear', v || null), 1920, new Date().getFullYear() - 18, 1)),
+    makeRow('Birth year',  yearInput(cli.birthYear, v => up('birthYear', v))),
     makeRow('Life expectancy (planning horizon, not a medical prediction)', ageInput(cli.lifeExpectancy, v => up('lifeExpectancy', v)), 'yrs'),
     subhead('Income — gross, before tax. Employer super is paid on top.'),
     makeRow('Full-time income (gross, before tax)',  numInput(cli.ftIncome, v => up('ftIncome', v)), '$/yr'),
