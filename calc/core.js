@@ -253,14 +253,16 @@ export function runProjection(params, applySequencing = false) {
       drawdownYear++;
 
       // Still-working clients accumulate separately; their net income offsets the draw
-      let workingNetIncome = 0;
+      let workingNetIncome  = 0;
+      let workingGrossIncome = 0;
       for (let i = 0; i < 2; i++) {
         const st = cs[i];
         if (!st.alive || st.atFreedom) continue;
         const cli = c[i];
         const base   = st.age >= cli.ptAge ? cli.ptIncome : cli.ftIncome;
         const salary = base * Math.pow(1 + INFLATION, t - 1);
-        workingNetIncome += calcNetIncome(salary);
+        workingNetIncome   += calcNetIncome(salary);
+        workingGrossIncome += salary;
         // Skip accumStep in the year drawdown first starts — pre-drawdown loop already ran it
         if (!row.retirementStart) {
           row[`salary${i}`] = salary;
@@ -290,7 +292,8 @@ export function runProjection(params, applySequencing = false) {
         row[`accum${i}`]   = st.accum;
         row[`pension${i}`] = st.pension;
       }
-      row.workingNetIncome = workingNetIncome;
+      row.workingNetIncome   = workingNetIncome;
+      row.workingGrossIncome = workingGrossIncome;
 
       const survivalFactor = survivorMode ? (surv.expenseFactor ?? 0.70) : 1.0;
       // Phased income: look up which phase applies at this age (today's dollars)
@@ -330,15 +333,20 @@ export function runProjection(params, applySequencing = false) {
       }
 
       // Age Pension
+      // Working partner's super is assessable once both partners are over pension age
+      const stillWorkingSuper = cs.reduce(
+        (sum, st) => (!st.alive || st.atFreedom) ? sum : sum + st.accum + st.pension, 0
+      );
       let pensionIncome = 0;
       if (pen.include) {
         const aliveAges   = cs.filter(s => s.alive).map(s => s.age);
         const youngestAge = Math.min(...aliveAges);
         if (youngestAge >= (pen.pensionAge ?? 67)) {
+          const totalAssets = combinedBal + stillWorkingSuper;
           const penRes = calcPension({
-            assets:          combinedBal,
-            financialAssets: combinedBal,
-            earnedIncome:    0,
+            assets:          totalAssets,
+            financialAssets: totalAssets,
+            earnedIncome:    workingGrossIncome,
             homeowner:       pen.homeowner ?? true,
             bothAlive,
             pensionYear:     drawdownYear - 1,
@@ -384,10 +392,6 @@ export function runProjection(params, applySequencing = false) {
       if (drawdownYear <= planYears && newBal >= desiredNominal * (1 + INFLATION)) yearsFullyFunded++;
 
       combinedBal   = Math.max(0, newBal);
-      // Include still-working partner's separate super so total wealth tracks smoothly
-      const stillWorkingSuper = cs.reduce(
-        (sum, st) => (!st.alive || st.atFreedom) ? sum : sum + st.accum + st.pension, 0
-      );
       row.stillWorkingSuper = stillWorkingSuper;
       row.totalWealth = combinedBal + stillWorkingSuper + (agedCareBal ?? 0);
     } else {
