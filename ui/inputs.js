@@ -26,13 +26,34 @@ function makeRow(label, control, suffix = '') {
 }
 
 function numInput(value, onInput, min = 0, max = 999999999, step = 1) {
-  const inp = document.createElement('input');
-  inp.type = 'number';
-  inp.value = value;
-  inp.min = min;
-  inp.max = max;
-  inp.step = step;
-  inp.addEventListener('input', () => onInput(parseFloat(inp.value) || 0));
+  const inp       = document.createElement('input');
+  inp.type        = 'text';
+  inp.inputMode   = step < 1 ? 'decimal' : 'numeric';
+  const decimals  = step < 1 ? (String(step).split('.')[1]?.length ?? 2) : 0;
+
+  function parse(s) {
+    const n = decimals ? parseFloat(String(s).replace(/,/g, ''))
+                       : parseInt(String(s).replace(/,/g, ''), 10);
+    return isNaN(n) ? 0 : n;
+  }
+  function format(n) {
+    if (n == null || n === '') return '';
+    if (decimals) return Number(n).toLocaleString('en-AU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    return Math.round(n).toLocaleString('en-AU');
+  }
+
+  inp.value = format(value);
+
+  inp.addEventListener('focus', () => {
+    inp.value = inp.value.replace(/,/g, '');
+    inp.select();
+  });
+  inp.addEventListener('input', () => onInput(parse(inp.value)));
+  inp.addEventListener('blur',  () => {
+    const v = parse(inp.value);
+    inp.value = format(v);
+    onInput(v);
+  });
   return inp;
 }
 
