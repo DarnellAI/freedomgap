@@ -1,5 +1,5 @@
 import { INFLATION, SUPER, RETURN_PROFILES } from '../data/parameters.js';
-import { accumStep, accumCompound, pensionCompound, convertToPension, minDrawdownAmount } from './tax.js';
+import { accumStep, accumCompound, pensionCompound, convertToPension, minDrawdownAmount, calcNetIncome } from './tax.js';
 import { calcPension, safeEarnAmount } from './pension.js';
 
 function getReturnRate(profile) {
@@ -115,6 +115,9 @@ export function runProjection(params, applySequencing = false) {
         row.sgcTotal    = (row.sgcTotal    ?? 0) + acc.contribGross;
         row.returnAccum = (row.returnAccum ?? 0) + acc.grossReturn;
         row.taxAccum    = (row.taxAccum    ?? 0) + acc.tax;
+        row[`sgc${i}`]    = acc.contribGross;
+        row[`return${i}`] = acc.grossReturn;
+        row[`tax${i}`]    = acc.tax;
         // Grow any pension balance received via survivor transfer while still working
         if (st.pension > 0) {
           const p = pensionCompound(st.pension, returnRate);
@@ -205,14 +208,38 @@ export function runProjection(params, applySequencing = false) {
       }
     }
 
-    // ── Start drawdown when both at freedom ────────────────────────────────────
+    // ── Start drawdown when any client reaches freedom AND income gap exists ───
+    const anyAtFreedom = cs.some(st => !st.alive || st.atFreedom);
     const allAtFreedom = cs.every(st => !st.alive || st.atFreedom);
-    if (allAtFreedom && !drawdownStarted) {
-      pensionBal         = cs.reduce((sum, st) => sum + st.pension, 0);
-      combinedBal        = pensionBal + cs.reduce((sum, st) => sum + st.accum, 0) + nonSuper;
-      retirementCombined = combinedBal;
-      drawdownStarted    = true;
-      row.retirementStart = true;
+    if (anyAtFreedom && !drawdownStarted) {
+      // Working net income from still-working clients
+      let workingCheck = 0;
+      for (let i = 0; i < 2; i++) {
+        const st = cs[i];
+        if (!st.alive || st.atFreedom) continue;
+        const cli = c[i];
+        const base = st.age >= cli.ptAge ? cli.ptIncome : cli.ftIncome;
+        workingCheck += calcNetIncome(base * Math.pow(1 + INFLATION, t - 1));
+      }
+      // Desired income in nominal terms at this year
+      let phaseBaseCheck = s.desiredIncome ?? 0;
+      const phasesCheck  = s.incomePhases;
+      if (phasesCheck && phasesCheck.length > 0) {
+        for (const ph of phasesCheck) {
+          phaseBaseCheck = ph.income ?? 0;
+          if (ph.untilAge == null || chartAge < ph.untilAge) break;
+        }
+      }
+      const desiredCheck = phaseBaseCheck * Math.pow(1 + INFLATION, t - 1);
+      if (allAtFreedom || workingCheck < desiredCheck + debtRepaymentThisYear) {
+        pensionBal  = cs.reduce((sum, st) => sum + ((!st.alive || st.atFreedom) ? st.pension : 0), 0);
+        combinedBal = pensionBal
+                    + cs.reduce((sum, st) => sum + ((!st.alive || st.atFreedom) ? st.accum : 0), 0)
+                    + nonSuper;
+        retirementCombined = combinedBal;
+        drawdownStarted    = true;
+        row.retirementStart = true;
+      }
     }
 
     // Debt repayments during accumulation reduce non-super savings.
@@ -224,6 +251,47 @@ export function runProjection(params, applySequencing = false) {
     // ── Drawdown ───────────────────────────────────────────────────────────────
     if (drawdownStarted) {
       drawdownYear++;
+
+      // Still-working clients accumulate separately; their net income offsets the draw
+      let workingNetIncome = 0;
+      for (let i = 0; i < 2; i++) {
+        const st = cs[i];
+        if (!st.alive || st.atFreedom) continue;
+        const cli = c[i];
+        const base   = st.age >= cli.ptAge ? cli.ptIncome : cli.ftIncome;
+        const salary = base * Math.pow(1 + INFLATION, t - 1);
+        workingNetIncome += calcNetIncome(salary);
+        // Skip accumStep in the year drawdown first starts — pre-drawdown loop already ran it
+        if (!row.retirementStart) {
+          row[`salary${i}`] = salary;
+          const addCC = Math.min(cli.additionalConcessional ?? 0, SUPER.concessionalCap);
+          const acc   = accumStep(st.accum, salary, s.sgcRate ?? 0.12, addCC, returnRate);
+          st.accum    = acc.closing;
+          row[`sgc${i}`]    = acc.contribGross;
+          row[`return${i}`] = acc.grossReturn;
+          row[`tax${i}`]    = acc.tax;
+        }
+        // Client reaches their freedom age mid-drawdown → merge into pool
+        if (st.age >= cli.freedomAge) {
+          if (cli.downsizer?.active && st.age >= 55) {
+            st.accum += Math.min(cli.downsizer.amount ?? 0, SUPER.downsizer.maxPerPerson);
+          }
+          const conv  = convertToPension(st.accum, st.tbcUsed);
+          st.pension  = conv.pensionAdded;
+          st.accum    = conv.accumRemaining;
+          st.tbcUsed  = conv.newTbcUsed;
+          st.atFreedom = true;
+          combinedBal += st.pension + st.accum;
+          pensionBal  += st.pension;
+          st.pension = 0;
+          st.accum   = 0;
+          row.partnerJoinsRetirement = true;
+        }
+        row[`accum${i}`]   = st.accum;
+        row[`pension${i}`] = st.pension;
+      }
+      row.workingNetIncome = workingNetIncome;
+
       const survivalFactor = survivorMode ? (surv.expenseFactor ?? 0.70) : 1.0;
       // Phased income: look up which phase applies at this age (today's dollars)
       const phases = s.incomePhases;
@@ -286,7 +354,7 @@ export function runProjection(params, applySequencing = false) {
       const oldestAliveAge = Math.max(...cs.filter(s => s.alive).map(s => s.age));
       const minDraw = minDrawdownAmount(pensionBal, oldestAliveAge);
       // Debt repayments are added on top of desired income until each debt is cleared
-      const netDraw = Math.max(0, desiredNominal - pensionIncome) + debtRepaymentThisYear;
+      const netDraw = Math.max(0, desiredNominal - pensionIncome - workingNetIncome) + debtRepaymentThisYear;
       const excessMinDraw = Math.max(0, minDraw - netDraw);
       const effectiveDraw = netDraw;
       row.minDrawdown = minDraw;

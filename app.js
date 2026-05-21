@@ -360,14 +360,13 @@ function exportWorkingsXLSX() {
   XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
 
   // ── Sheet 2: Accumulation ────────────────────────────────────────────────────
+  const n0 = c[0].name, n1 = c[1].name;
   const aHdr = [
-    'Age (C1/C2)', `${c[0].name} Age`, `${c[1].name} Age`,
-    'Opening Portfolio',
-    `${c[0].name} Salary`, `${c[0].name} Super Balance (closing)`,
-    `${c[1].name} Salary`, `${c[1].name} Super Balance (closing)`,
-    'Combined SGC', `Return @ ${rPct}%`, 'Contributions & Earnings Tax (15%)',
-    'Non-Super Balance', 'Total Portfolio (closing)',
-    'Check: Opening + SGC + Return − Tax',
+    'Age (C1/C2)', `${n0} Age`, `${n1} Age`,
+    `${n0} Salary`, `${n0} Opening Super`, `${n0} SGC`, `${n0} Return @ ${rPct}%`, `${n0} Tax (15%)`, `${n0} Closing Super`,
+    `${n1} Salary`, `${n1} Opening Super`, `${n1} SGC`, `${n1} Return @ ${rPct}%`, `${n1} Tax (15%)`, `${n1} Closing Super`,
+    'Non-Super Balance', 'Total Portfolio',
+    'Check: ΣOpening + ΣSGC + ΣReturn − ΣTax',
   ];
   const aBody = accumRows.map((row, idx) => {
     const s0 = (row.accum0 ?? 0) + (row.pension0 ?? 0);
@@ -378,32 +377,33 @@ function exportWorkingsXLSX() {
     const openNS  = prevRow
       ? Math.max(0, (prevRow.totalWealth ?? 0) - ((prevRow.accum0 ?? 0) + (prevRow.pension0 ?? 0) + (prevRow.accum1 ?? 0) + (prevRow.pension1 ?? 0)))
       : (state.shared.nonSuper ?? 0);
-    const opening = openS0 + openS1 + openNS;
-    const sgc     = row.sgcTotal    ?? 0;
-    const ret     = row.returnAccum ?? 0;
-    const tax     = row.taxAccum    ?? 0;
-    const nonSuper = Math.max(0, (row.totalWealth ?? 0) - s0 - s1);
+    const sgc0 = row.sgc0    ?? 0;
+    const ret0 = row.return0 ?? 0;
+    const tax0 = row.tax0    ?? 0;
+    const sgc1 = row.sgc1    ?? 0;
+    const ret1 = row.return1 ?? 0;
+    const tax1 = row.tax1    ?? 0;
+    const nonSuperBal = Math.max(0, (row.totalWealth ?? 0) - s0 - s1);
     return [
       ageLabel(row.chartAge), clientAge(0, row.chartAge), clientAge(1, row.chartAge),
-      opening,
-      row.salary0 ?? 0, s0,
-      row.salary1 ?? 0, s1,
-      sgc, ret, tax,
-      nonSuper,
+      row.salary0 ?? 0, openS0, sgc0, ret0, tax0, s0,
+      row.salary1 ?? 0, openS1, sgc1, ret1, tax1, s1,
+      nonSuperBal,
       row.totalWealth ?? 0,
-      opening + sgc + ret - tax,  // reconciliation check — should equal Total Portfolio
+      (openS0 + openS1 + openNS) + (sgc0 + sgc1) + (ret0 + ret1) - (tax0 + tax1),
     ];
   });
   const ws2 = XLSX.utils.aoa_to_sheet([aHdr, ...aBody]);
-  ws2['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }, ...Array(11).fill({ wch: 20 })];
-  applyColFormat(ws2, [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], CUR, aBody.length);
+  ws2['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }, ...Array(15).fill({ wch: 20 })];
+  // Currency format for all dollar columns (indices 3–17)
+  applyColFormat(ws2, Array.from({ length: 15 }, (_, i) => i + 3), CUR, aBody.length);
   XLSX.utils.book_append_sheet(wb, ws2, 'Accumulation');
 
   // ── Sheet 3: Drawdown ────────────────────────────────────────────────────────
   const dHdr = [
     'Age (C1/C2)', `${c[0].name} Age`, `${c[1].name} Age`, 'Retirement Year',
     'Opening Balance', `Return @ ${rPct}%`, 'Desired Income (nominal)',
-    'Age Pension', 'Debt Repayments', 'Net Portfolio Draw',
+    'Age Pension', 'Working Partner Income', 'Debt Repayments', 'Net Portfolio Draw',
     'Min Drawdown', 'Closing Balance',
     'Pension — Asset Test', 'Pension — Income Test', 'Pension Binding',
     'Notes',
@@ -411,21 +411,23 @@ function exportWorkingsXLSX() {
   const dBody = drawRows.map(row => {
     const pr = row.pension;
     const notes = [
-      row.retirementStart ? 'Retirement begins'               : '',
-      row.survivorEvent   ? 'Survivor mode — partner deceased' : '',
-      row.sequencingShock ? '-25% sequencing shock'            : '',
-      row.agedCareSetup   ? 'Aged care reserve set aside'      : '',
+      row.retirementStart        ? 'Retirement begins'               : '',
+      row.partnerJoinsRetirement ? 'Working partner now retired'      : '',
+      row.survivorEvent          ? 'Survivor mode — partner deceased' : '',
+      row.sequencingShock        ? '-25% sequencing shock'            : '',
+      row.agedCareSetup          ? 'Aged care reserve set aside'      : '',
     ].filter(Boolean).join('; ');
     return [
       ageLabel(row.chartAge), clientAge(0, row.chartAge), clientAge(1, row.chartAge), row.dd,
-      row.startBalance    ?? 0,
-      row.grossReturn     ?? 0,
-      row.desiredNominal  ?? 0,
-      row.pensionIncome   ?? 0,
-      row.debtRepaymentYr ?? 0,
-      row.drawdownDraw    ?? 0,
-      row.minDrawdown     ?? 0,
-      row.endBalance      ?? 0,
+      row.startBalance       ?? 0,
+      row.grossReturn        ?? 0,
+      row.desiredNominal     ?? 0,
+      row.pensionIncome      ?? 0,
+      row.workingNetIncome   ?? 0,
+      row.debtRepaymentYr    ?? 0,
+      row.drawdownDraw       ?? 0,
+      row.minDrawdown        ?? 0,
+      row.endBalance         ?? 0,
       pr?.assetPension  ?? 0,
       pr?.incomePension ?? 0,
       pr?.binding       ?? '',
@@ -435,10 +437,10 @@ function exportWorkingsXLSX() {
   const ws3 = XLSX.utils.aoa_to_sheet([dHdr, ...dBody]);
   ws3['!cols'] = [
     { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 14 },
-    ...Array(8).fill({ wch: 20 }),
+    ...Array(9).fill({ wch: 20 }),
     { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 35 },
   ];
-  applyColFormat(ws3, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13], CUR, dBody.length);
+  applyColFormat(ws3, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], CUR, dBody.length);
   XLSX.utils.book_append_sheet(wb, ws3, 'Drawdown');
 
   // ── Sheet 4: Debt Schedule ───────────────────────────────────────────────────
