@@ -361,26 +361,41 @@ function exportWorkingsXLSX() {
   // ── Sheet 2: Accumulation ────────────────────────────────────────────────────
   const aHdr = [
     'Age (C1/C2)', `${c[0].name} Age`, `${c[1].name} Age`,
-    `${c[0].name} Salary`, `${c[0].name} Super Balance`,
-    `${c[1].name} Salary`, `${c[1].name} Super Balance`,
-    'Combined SGC', `Return @ ${rPct}%`, 'Contributions Tax (15%)',
-    'Non-Super Balance', 'Total Portfolio',
+    'Opening Portfolio',
+    `${c[0].name} Salary`, `${c[0].name} Super Balance (closing)`,
+    `${c[1].name} Salary`, `${c[1].name} Super Balance (closing)`,
+    'Combined SGC', `Return @ ${rPct}%`, 'Contributions & Earnings Tax (15%)',
+    'Non-Super Balance', 'Total Portfolio (closing)',
+    'Check: Opening + SGC + Return − Tax',
   ];
-  const aBody = accumRows.map(row => {
+  const aBody = accumRows.map((row, idx) => {
     const s0 = (row.accum0 ?? 0) + (row.pension0 ?? 0);
     const s1 = (row.accum1 ?? 0) + (row.pension1 ?? 0);
+    const prevRow = accumRows[idx - 1];
+    const openS0  = prevRow ? ((prevRow.accum0 ?? 0) + (prevRow.pension0 ?? 0)) : (c[0].superBalance ?? 0);
+    const openS1  = prevRow ? ((prevRow.accum1 ?? 0) + (prevRow.pension1 ?? 0)) : (c[1].superBalance ?? 0);
+    const openNS  = prevRow
+      ? Math.max(0, (prevRow.totalWealth ?? 0) - ((prevRow.accum0 ?? 0) + (prevRow.pension0 ?? 0) + (prevRow.accum1 ?? 0) + (prevRow.pension1 ?? 0)))
+      : (state.shared.nonSuper ?? 0);
+    const opening = openS0 + openS1 + openNS;
+    const sgc     = row.sgcTotal    ?? 0;
+    const ret     = row.returnAccum ?? 0;
+    const tax     = row.taxAccum    ?? 0;
+    const nonSuper = Math.max(0, (row.totalWealth ?? 0) - s0 - s1);
     return [
       ageLabel(row.chartAge), clientAge(0, row.chartAge), clientAge(1, row.chartAge),
+      opening,
       row.salary0 ?? 0, s0,
       row.salary1 ?? 0, s1,
-      row.sgcTotal ?? 0, row.returnAccum ?? 0, row.taxAccum ?? 0,
-      Math.max(0, (row.totalWealth ?? 0) - s0 - s1),
+      sgc, ret, tax,
+      nonSuper,
       row.totalWealth ?? 0,
+      opening + sgc + ret - tax,  // reconciliation check — should equal Total Portfolio
     ];
   });
   const ws2 = XLSX.utils.aoa_to_sheet([aHdr, ...aBody]);
-  ws2['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }, ...Array(9).fill({ wch: 18 })];
-  applyColFormat(ws2, [3, 4, 5, 6, 7, 8, 9, 10, 11], CUR, aBody.length);
+  ws2['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }, ...Array(11).fill({ wch: 20 })];
+  applyColFormat(ws2, [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], CUR, aBody.length);
   XLSX.utils.book_append_sheet(wb, ws2, 'Accumulation');
 
   // ── Sheet 3: Drawdown ────────────────────────────────────────────────────────
