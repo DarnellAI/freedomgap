@@ -15,12 +15,12 @@ function makeRow(label, control, suffix = '') {
   const wrap = document.createElement('div');
   wrap.className = 'control';
   wrap.appendChild(control);
-  if (suffix) {
-    const s = document.createElement('span');
-    s.className = 'suffix';
-    s.textContent = suffix;
-    wrap.appendChild(s);
-  }
+  // Always render suffix span (even if empty) so every row has identical
+  // control width and all input right edges land at the same x position
+  const s = document.createElement('span');
+  s.className = 'suffix';
+  s.textContent = suffix;
+  wrap.appendChild(s);
   div.appendChild(lbl);
   div.appendChild(wrap);
   return div;
@@ -213,7 +213,12 @@ function renderDebtInputs(state, onChange) {
 
   function up(key, val) { d[key] = val; onChange(); }
 
+  const help = document.createElement('p');
+  help.className = 'help';
+  help.textContent = 'Enter 0 for all fields if no debt. Interest accrues annually on the outstanding balance.';
+
   const rows = [
+    help,
     makeRow('Outstanding debt',   numInput(d.balance, v => up('balance', v)), '$'),
     makeRow('Interest rate',      pctInput(d.rate, v => up('rate', v)), '%'),
     makeRow('Annual repayment',   numInput(d.annualPayment, v => up('annualPayment', v)), '$/yr'),
@@ -290,9 +295,6 @@ function renderSurvivorInputs(state, onChange) {
       makeRow('Survivor expense factor', pctInput(surv.expenseFactor, v => up('expenseFactor', v)), '%'),
     );
   }
-  rows.push(
-    document.createElement('p'),  // spacer
-  );
   const help = document.createElement('p');
   help.className = 'help';
   help.textContent = 'On partner death, super balances merge to survivor within Transfer Balance Cap. Expenses reduce to the set percentage.';
