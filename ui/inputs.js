@@ -177,7 +177,11 @@ function renderClientInputs(idx, state, onChange) {
     makeRow('Super balance',     numInput(cli.superBalance, v => up('superBalance', v)), '$'),
     makeRow('Extra concessional',numInput(cli.additionalConcessional, v => up('additionalConcessional', v)), '$/yr'),
     subhead('Downsizer contribution'),
-    makeRow('Downsizer active',  checkInput(cli.downsizer.active, v => upDz('active', v))),
+    makeRow('Downsizer active',  checkInput(cli.downsizer.active, v => {
+      cli.downsizer.active = v;
+      renderClientInputs(idx, state, onChange);
+      onChange();
+    })),
   ];
   if (cli.downsizer.active) {
     rows.push(makeRow('Downsizer amount', numInput(cli.downsizer.amount, v => upDz('amount', v)), '$'));
@@ -303,13 +307,11 @@ function renderInheritanceInputs(state, onChange) {
     makeRow('Received at age',      ageInput(inh.ageReceived, v => up('ageReceived', v)), 'yrs'),
     makeRow('Route to',             selectInput([['nonSuper','Investments'],['super','Superannuation']], inh.destination, v => up('destination', v))),
   ];
-  if ((state.debts ?? []).some(d => d.balance > 0)) {
-    rows.push(makeRow('Pay off debt first', checkInput(inh.applyToDebtFirst ?? false, v => up('applyToDebtFirst', v))));
-    const note = document.createElement('p');
-    note.className = 'help';
-    note.textContent = 'Pays off outstanding debts (highest rate first) before routing the remainder.';
-    rows.push(note);
-  }
+  rows.push(makeRow('Pay off debt first', checkInput(inh.applyToDebtFirst ?? false, v => up('applyToDebtFirst', v))));
+  const note = document.createElement('p');
+  note.className = 'help';
+  note.textContent = 'Pays off outstanding debts (highest rate first) before routing the remainder.';
+  rows.push(note);
   rows.forEach(r => container.appendChild(r));
 }
 
@@ -338,7 +340,11 @@ function renderAgedCareInputs(state, onChange) {
   function up(key, val) { ac[key] = val; onChange(); }
 
   const rows = [
-    makeRow('Reserve for aged care', checkInput(ac.active, v => up('active', v))),
+    makeRow('Reserve for aged care', checkInput(ac.active, v => {
+      ac.active = v;
+      renderAgedCareInputs(state, onChange);
+      onChange();
+    })),
   ];
   if (ac.active) {
     rows.push(
@@ -359,7 +365,11 @@ function renderSurvivorInputs(state, onChange) {
   function up(key, val) { surv[key] = val; onChange(); }
 
   const rows = [
-    makeRow('Model survivor scenario', checkInput(surv.active, v => up('active', v))),
+    makeRow('Model survivor scenario', checkInput(surv.active, v => {
+      surv.active = v;
+      renderSurvivorInputs(state, onChange);
+      onChange();
+    })),
   ];
   if (surv.active) {
     rows.push(
@@ -382,7 +392,11 @@ function renderBequestInputs(state, onChange) {
   function up(key, val) { beq[key] = val; onChange(); }
 
   const rows = [
-    makeRow('Set bequest goal',   checkInput(beq.active, v => up('active', v))),
+    makeRow('Set bequest goal',   checkInput(beq.active, v => {
+      beq.active = v;
+      renderBequestInputs(state, onChange);
+      onChange();
+    })),
   ];
   if (beq.active) {
     rows.push(makeRow('Target bequest', numInput(beq.amount, v => up('amount', v)), '$'));
