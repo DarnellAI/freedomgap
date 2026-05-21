@@ -186,3 +186,104 @@ export function updateChart(scenarioResults) {
   chartInstance.data.datasets = datasets;
   chartInstance.update('none');
 }
+
+// ── Debt paydown chart ────────────────────────────────────────────────────────
+
+let debtChartInstance = null;
+
+export function initDebtChart(canvasId) {
+  const el = document.getElementById(canvasId);
+  if (!el) return null;
+  debtChartInstance = new Chart(el.getContext('2d'), {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => {
+              const v = c.raw;
+              return (v == null) ? '' : `${c.dataset.label}: ${fmtM(v)}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 11 } } },
+        y: {
+          grid: { color: '#e2e8f0' },
+          ticks: { color: '#64748b', font: { size: 11 }, callback: v => fmtM(v) },
+          beginAtZero: true,
+        },
+      },
+    },
+  });
+  return debtChartInstance;
+}
+
+const DEBT_COLORS = ['#1B2A4E', '#C9A961', '#0E7490', '#BE185D', '#64748B'];
+
+export function updateDebtChart(scenarioResults) {
+  if (!debtChartInstance) return;
+
+  // Use the first visible scenario that has debt data
+  const primary = scenarioResults.find(r => r.result.debtNames?.length > 0) ?? scenarioResults[0];
+  const hasDebt = primary?.result.debtNames?.length > 0;
+
+  const section = document.getElementById('debtChartSection');
+  if (section) section.classList.toggle('hidden', !hasDebt);
+
+  if (!hasDebt) {
+    debtChartInstance.data.labels = [];
+    debtChartInstance.data.datasets = [];
+    debtChartInstance.update('none');
+    updateDebtLegend([]);
+    return;
+  }
+
+  const { result } = primary;
+  const maxAge = result.planToAge ?? 95;
+  const ages = [...new Set(
+    result.rows.filter(r => r.chartAge != null && r.chartAge <= maxAge && r.debtBalances != null).map(r => r.chartAge)
+  )].sort((a, b) => a - b);
+
+  const datasets = result.debtNames.map((name, i) => ({
+    label: name || `Debt ${i + 1}`,
+    data: ages.map(age => {
+      const row = result.rows.find(r => r.chartAge === age);
+      return row?.debtBalances?.[i] ?? null;
+    }),
+    borderColor: DEBT_COLORS[i % DEBT_COLORS.length],
+    backgroundColor: DEBT_COLORS[i % DEBT_COLORS.length] + '20',
+    fill: true,
+    tension: 0.2,
+    pointRadius: 0,
+    pointHoverRadius: 4,
+    borderWidth: 2,
+  }));
+
+  debtChartInstance.data.labels = ages.map(String);
+  debtChartInstance.data.datasets = datasets;
+  debtChartInstance.update('none');
+  updateDebtLegend(result.debtNames);
+}
+
+function updateDebtLegend(names) {
+  const container = document.getElementById('debtChartLegend');
+  if (!container) return;
+  container.innerHTML = '';
+  names.forEach((name, i) => {
+    const wrap = document.createElement('span');
+    wrap.className = 'flex items-center';
+    const dot = document.createElement('span');
+    dot.className = 'legend-dot';
+    dot.style.background = DEBT_COLORS[i % DEBT_COLORS.length];
+    wrap.appendChild(dot);
+    wrap.appendChild(document.createTextNode(name || `Debt ${i + 1}`));
+    container.appendChild(wrap);
+  });
+}

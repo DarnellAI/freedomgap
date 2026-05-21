@@ -1,7 +1,7 @@
 import { DEFAULT_STATE, PENSION, SCENARIO_COLORS, SCENARIO_NAMES, MAX_SCENARIOS, RETURN_PROFILES } from './data/parameters.js';
 import { runProjection } from './calc/core.js';
 import { safeEarnAmount } from './calc/pension.js';
-import { initChart, updateChart } from './ui/chart.js';
+import { initChart, updateChart, initDebtChart, updateDebtChart } from './ui/chart.js';
 import { renderInputs } from './ui/inputs.js';
 import {
   defaultScenario, loadScenarios, saveScenarios,
@@ -9,10 +9,30 @@ import {
   renderScenarioTabs, renderSequencingToggle,
 } from './ui/scenarios.js';
 
+// ── State migration (old single-debt format → debts array) ────────────────────
+function migrateState(state) {
+  if (state.debt !== undefined && !state.debts) {
+    state.debts = (state.debt?.balance > 0) ? [{
+      name: 'Loan',
+      balance: state.debt.balance ?? 0,
+      rate: state.debt.rate ?? 0.06,
+      repayment: state.debt.annualPayment ?? 0,
+      frequency: 'annual',
+    }] : [];
+    delete state.debt;
+  }
+  if (!state.debts) state.debts = [];
+  if (state.inheritance && state.inheritance.applyToDebtFirst === undefined) {
+    state.inheritance.applyToDebtFirst = false;
+  }
+  return state;
+}
+
 // ── State ──────────────────────────────────────────────────────────────────────
-let scenarios   = loadScenarios();
+let scenarios   = loadScenarios().map(sc => { sc.state = migrateState(sc.state); return sc; });
 let activeId    = scenarios[0]?.id ?? 0;
 let chart       = null;
+let debtChart   = null;
 
 function activeScenario() { return scenarios.find(s => s.id === activeId) ?? scenarios[0]; }
 
@@ -30,6 +50,7 @@ function recalc() {
   if (primary) updateOutputs(primary.result);
   updateChart(results);
   updateChartLegend(results);
+  updateDebtChart(results);
   saveScenarios(scenarios);
 }
 
@@ -204,8 +225,8 @@ const EXAMPLE = {
     { name: 'Client 2', gender: 'female', currentAge: 65, lifeExpectancy: 90, ftIncome: 58000,  ptAge: 66, ptIncome: 80000,  freedomAge: 72, superBalance: 185000, additionalConcessional: 0, downsizer: { active: false, amount: 0 } },
   ],
   shared:      { returnProfile: 'growth', sgcRate: 0.12, nonSuper: 0, desiredIncome: 140000, planToAge: 90, minDrawdownExcess: 'invest' },
-  debt:        { balance: 0, rate: 0.06, annualPayment: 0 },
-  inheritance: { amount: 0, ageReceived: 75, destination: 'nonSuper' },
+  debts:       [],
+  inheritance: { amount: 0, ageReceived: 75, destination: 'nonSuper', applyToDebtFirst: false },
   pension:     { include: false, homeowner: true, pensionAge: 67 },
   agedCare:    { active: false, amount: 500000, triggerAge: 85, mode: 'invested' },
   survivor:    { active: false, expenseFactor: 0.70 },
@@ -214,7 +235,8 @@ const EXAMPLE = {
 
 // ── Init ───────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  chart = initChart('wealthChart');
+  chart     = initChart('wealthChart');
+  debtChart = initDebtChart('debtChart');
 
   document.getElementById('resetBtn').addEventListener('click', () => {
     if (!confirm('Reset all scenarios to defaults?')) return;
@@ -234,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('importBtn').addEventListener('click', () => {
     importJSON(imported => {
-      scenarios = imported;
+      scenarios = imported.map(sc => { sc.state = migrateState(sc.state); return sc; });
       activeId  = scenarios[0]?.id ?? 0;
       refreshUI();
       recalc();

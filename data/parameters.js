@@ -100,15 +100,12 @@ export const DEFAULT_STATE = {
     planToAge: 95,
     minDrawdownExcess: 'invest',
   },
-  debt: {
-    balance: 0,
-    rate: 0.06,
-    annualPayment: 30000,
-  },
+  debts: [],
   inheritance: {
     amount: 0,
     ageReceived: 75,
     destination: 'nonSuper',
+    applyToDebtFirst: false,
   },
   pension: {
     include: true,

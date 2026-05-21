@@ -210,6 +210,7 @@ function renderSharedInputs(state, onChange) {
     makeRow('SGC rate',            pctInput(s.sgcRate, v => up('sgcRate', v)), '%'),
     makeRow('Desired income',      numInput(s.desiredIncome, v => up('desiredIncome', v)), '$/yr'),
     replNote,
+    (() => { const p = document.createElement('p'); p.className = 'help'; p.textContent = 'Excludes debt repayments — these are added on top automatically.'; return p; })(),
     makeRow('Non-super savings',   numInput(s.nonSuper, v => up('nonSuper', v)), '$'),
     makeRow('Plan to age',         ageInput(s.planToAge, v => up('planToAge', v)), 'yrs'),
     subhead('Inflation: fixed at 2.5%'),
@@ -217,25 +218,76 @@ function renderSharedInputs(state, onChange) {
   rows.forEach(r => container.appendChild(r));
 }
 
+function renderOneDebt(d, i, state, onChange) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'border-top:1px solid var(--border);padding-top:.6rem;display:flex;flex-direction:column;gap:.4rem;';
+
+  function up(key, val) { d[key] = val; onChange(); }
+
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;gap:.5rem;';
+  const nameInp = document.createElement('input');
+  nameInp.type = 'text';
+  nameInp.value = d.name ?? '';
+  nameInp.placeholder = `Debt ${i + 1} (e.g. Home loan)`;
+  nameInp.style.cssText = 'flex:1;padding:.3rem .5rem;border:1px solid var(--border);border-radius:.4rem;font-size:.82rem;background:var(--cream);color:var(--ink);';
+  nameInp.addEventListener('input', () => up('name', nameInp.value));
+  const removeBtn = document.createElement('button');
+  removeBtn.textContent = '✕';
+  removeBtn.title = 'Remove this debt';
+  removeBtn.style.cssText = 'padding:.2rem .55rem;border:1px solid #fca5a5;border-radius:.4rem;font-size:.75rem;cursor:pointer;color:#dc2626;background:none;';
+  removeBtn.addEventListener('click', () => {
+    state.debts.splice(i, 1);
+    renderDebtInputs(state, onChange);
+    onChange();
+  });
+  header.appendChild(nameInp);
+  header.appendChild(removeBtn);
+  wrap.appendChild(header);
+
+  const freqOpts = [['weekly','Weekly'],['fortnightly','Fortnightly'],['monthly','Monthly'],['annual','Annual']];
+  [
+    makeRow('Balance',       numInput(d.balance,   v => up('balance', v)),   '$'),
+    makeRow('Interest rate', pctInput(d.rate,      v => up('rate', v)),      '%'),
+    makeRow('Repayment',     numInput(d.repayment, v => up('repayment', v)), '$'),
+    makeRow('Frequency',     selectInput(freqOpts, d.frequency ?? 'monthly', v => up('frequency', v))),
+  ].forEach(r => wrap.appendChild(r));
+  return wrap;
+}
+
 function renderDebtInputs(state, onChange) {
-  const d = state.debt;
+  if (!state.debts) state.debts = [];
   const container = document.getElementById('debtInputs');
   if (!container) return;
   container.innerHTML = '';
 
-  function up(key, val) { d[key] = val; onChange(); }
-
   const help = document.createElement('p');
   help.className = 'help';
-  help.textContent = 'Enter 0 for all fields if no debt. Interest accrues annually on the outstanding balance.';
+  help.textContent = 'Repayments reduce non-super savings during accumulation and are added on top of desired income in retirement until each debt is cleared.';
+  container.appendChild(help);
 
-  const rows = [
-    help,
-    makeRow('Outstanding debt',   numInput(d.balance, v => up('balance', v)), '$'),
-    makeRow('Interest rate',      pctInput(d.rate, v => up('rate', v)), '%'),
-    makeRow('Annual repayment',   numInput(d.annualPayment, v => up('annualPayment', v)), '$/yr'),
-  ];
-  rows.forEach(r => container.appendChild(r));
+  if (state.debts.length === 0) {
+    const none = document.createElement('p');
+    none.className = 'help';
+    none.style.fontStyle = 'italic';
+    none.textContent = 'No debts added.';
+    container.appendChild(none);
+  } else {
+    state.debts.forEach((d, i) => container.appendChild(renderOneDebt(d, i, state, onChange)));
+  }
+
+  if (state.debts.length < 5) {
+    const addBtn = document.createElement('button');
+    addBtn.className = 'scenario-add';
+    addBtn.style.marginTop = '.4rem';
+    addBtn.textContent = '+ Add debt';
+    addBtn.addEventListener('click', () => {
+      state.debts.push({ name: '', balance: 0, rate: 0.06, repayment: 0, frequency: 'monthly' });
+      renderDebtInputs(state, onChange);
+      onChange();
+    });
+    container.appendChild(addBtn);
+  }
 }
 
 function renderInheritanceInputs(state, onChange) {
@@ -251,6 +303,13 @@ function renderInheritanceInputs(state, onChange) {
     makeRow('Received at age',      ageInput(inh.ageReceived, v => up('ageReceived', v)), 'yrs'),
     makeRow('Route to',             selectInput([['nonSuper','Investments'],['super','Superannuation']], inh.destination, v => up('destination', v))),
   ];
+  if ((state.debts ?? []).some(d => d.balance > 0)) {
+    rows.push(makeRow('Pay off debt first', checkInput(inh.applyToDebtFirst ?? false, v => up('applyToDebtFirst', v))));
+    const note = document.createElement('p');
+    note.className = 'help';
+    note.textContent = 'Pays off outstanding debts (highest rate first) before routing the remainder.';
+    rows.push(note);
+  }
   rows.forEach(r => container.appendChild(r));
 }
 

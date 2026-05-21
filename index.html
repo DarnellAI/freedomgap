@@ -108,6 +108,17 @@
     </div>
   </section>
 
+  <!-- ════════════════════════════════ DEBT PAYDOWN CHART -->
+  <section id="debtChartSection" class="rounded-2xl bg-white shadow-sm p-4 sm:p-6 mb-5 hidden">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <h2 class="text-lg font-semibold text-[#1B2A4E]" style="font-family:'Playfair Display',serif">Debt paydown by age</h2>
+      <div id="debtChartLegend" class="flex flex-wrap gap-3 text-xs text-slate-500"></div>
+    </div>
+    <div class="relative" style="height:14rem">
+      <canvas id="debtChart"></canvas>
+    </div>
+  </section>
+
   <!-- ════════════════════════════════ KEY METRICS -->
   <section class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
     <div class="metric-card rounded-xl">

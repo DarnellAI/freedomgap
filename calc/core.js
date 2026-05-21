@@ -25,7 +25,14 @@ export function requiredBalance(desiredIncome, returnRate, years) {
 export function runProjection(params, applySequencing = false) {
   const c = params.clients;
   const s = params.shared;
-  const debt = params.debt   ?? { balance: 0, rate: 0, annualPayment: 0 };
+  const rawDebts = params.debts ?? (params.debt ? [{ name: 'Loan', balance: params.debt.balance ?? 0, rate: params.debt.rate ?? 0.06, repayment: params.debt.annualPayment ?? 0, frequency: 'annual' }] : []);
+  function freqMult(f) { return { weekly: 52, fortnightly: 26, monthly: 12, annual: 1 }[f] ?? 12; }
+  const debtState = rawDebts.filter(d => d.balance > 0).map(d => ({
+    name: d.name || 'Debt',
+    balance: d.balance,
+    rate: d.rate ?? 0.06,
+    annualRep: (d.repayment ?? 0) * freqMult(d.frequency ?? 'monthly'),
+  }));
   const inh  = params.inheritance ?? { amount: 0, ageReceived: 75, destination: 'nonSuper' };
   const pen  = params.pension ?? { include: true, homeowner: true, pensionAge: 67 };
   const ac   = params.agedCare  ?? { active: false, amount: 500000, triggerAge: 85, mode: 'invested' };
@@ -52,7 +59,7 @@ export function runProjection(params, applySequencing = false) {
   }));
 
   let nonSuper       = s.nonSuper ?? 0;
-  let debtBal        = debt.balance ?? 0;
+  let debtRepaymentThisYear = 0;
   let agedCareBal    = null;
   let survivorMode   = false;
   let bothAlive      = true;
@@ -74,11 +81,17 @@ export function runProjection(params, applySequencing = false) {
     const row = { t, chartAge, ages: [cs[0].age, cs[1].age], alive: [cs[0].alive, cs[1].alive] };
 
     // ── Debt ───────────────────────────────────────────────────────────────────
-    if (debtBal > 0 && debt.annualPayment > 0) {
-      const interest = debtBal * (debt.rate ?? 0.06);
-      debtBal = Math.max(0, debtBal + interest - debt.annualPayment);
-      row.debtBalance = debtBal;
+    debtRepaymentThisYear = 0;
+    for (const db of debtState) {
+      if (db.balance <= 0) continue;
+      const interest = db.balance * db.rate;
+      const totalOwed = db.balance + interest;
+      const actualRepay = Math.min(db.annualRep, totalOwed);
+      db.balance = Math.max(0, totalOwed - db.annualRep);
+      debtRepaymentThisYear += actualRepay;
     }
+    row.debtBalances = debtState.map(db => db.balance);
+    row.totalDebt    = row.debtBalances.reduce((s, v) => s + v, 0);
 
     // ── Per-client accumulation (only before drawdown starts) ─────────────────
     for (let i = 0; i < 2; i++) {
@@ -131,19 +144,33 @@ export function runProjection(params, applySequencing = false) {
     }
 
     // ── Inheritance ────────────────────────────────────────────────────────────
-    // Trigger based on calendar year (t), not cs[0].age — cs[0] may die before ageReceived
     const inhTriggerYear = inh.ageReceived - c[0].currentAge + 1;
     if (inh.amount > 0 && t === inhTriggerYear) {
-      if (drawdownStarted) {
-        combinedBal += inh.amount;
-      } else if (inh.destination === 'super') {
-        const toSuper  = Math.min(inh.amount, SUPER.nccAnnual);
-        const toInvest = inh.amount - toSuper;
-        const idx = cs[0].tbcUsed <= cs[1].tbcUsed ? 0 : 1;
-        cs[idx].accum += toSuper;
-        nonSuper      += toInvest;
-      } else {
-        nonSuper += inh.amount;
+      let inhRemaining = inh.amount;
+      // Pay down debt first (highest rate first) if toggled
+      if (inh.applyToDebtFirst) {
+        const sorted = [...debtState].sort((a, b) => b.rate - a.rate);
+        for (const db of sorted) {
+          if (db.balance <= 0 || inhRemaining <= 0) continue;
+          const payoff = Math.min(inhRemaining, db.balance);
+          db.balance  -= payoff;
+          inhRemaining -= payoff;
+        }
+        row.debtBalances = debtState.map(db => db.balance);
+        row.totalDebt    = row.debtBalances.reduce((s, v) => s + v, 0);
+      }
+      if (inhRemaining > 0) {
+        if (drawdownStarted) {
+          combinedBal += inhRemaining;
+        } else if (inh.destination === 'super') {
+          const toSuper  = Math.min(inhRemaining, SUPER.nccAnnual);
+          const toInvest = inhRemaining - toSuper;
+          const idx = cs[0].tbcUsed <= cs[1].tbcUsed ? 0 : 1;
+          cs[idx].accum += toSuper;
+          nonSuper      += toInvest;
+        } else {
+          nonSuper += inhRemaining;
+        }
       }
     }
 
@@ -179,6 +206,12 @@ export function runProjection(params, applySequencing = false) {
       retirementCombined = combinedBal;
       drawdownStarted    = true;
       row.retirementStart = true;
+    }
+
+    // Debt repayments during accumulation reduce non-super savings.
+    // In retirement they are included in the drawdown below.
+    if (!drawdownStarted) {
+      nonSuper = Math.max(0, nonSuper - debtRepaymentThisYear);
     }
 
     // ── Drawdown ───────────────────────────────────────────────────────────────
@@ -235,10 +268,10 @@ export function runProjection(params, applySequencing = false) {
       // Min drawdown enforcement
       const oldestAliveAge = Math.max(...cs.filter(s => s.alive).map(s => s.age));
       const minDraw = minDrawdownAmount(pensionBal, oldestAliveAge);
-      const netDraw = Math.max(0, desiredNominal - pensionIncome);
-      // Excess min draw above income needs is reinvested (stays in pool as non-super savings)
+      // Debt repayments are added on top of desired income until each debt is cleared
+      const netDraw = Math.max(0, desiredNominal - pensionIncome) + debtRepaymentThisYear;
       const excessMinDraw = Math.max(0, minDraw - netDraw);
-      const effectiveDraw = netDraw;  // pool only loses what's actually consumed for living
+      const effectiveDraw = netDraw;
       row.minDrawdown = minDraw;
       row.excessMinDraw = excessMinDraw;
 
@@ -289,6 +322,7 @@ export function runProjection(params, applySequencing = false) {
     returnRate,
     planToAge: s.planToAge ?? 95,
     desiredIncome: s.desiredIncome,
+    debtNames: debtState.map(db => db.name),
     pensionStartAge,
     lastPensionResult,
     safeEarn: safeEarnAmount(true),
