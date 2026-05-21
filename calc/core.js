@@ -108,6 +108,9 @@ export function runProjection(params, applySequencing = false) {
         const addCC = Math.min(cli.additionalConcessional ?? 0, SUPER.concessionalCap);
         const acc   = accumStep(st.accum, salary, s.sgcRate ?? 0.12, addCC, returnRate);
         st.accum    = acc.closing;
+        row.sgcTotal    = (row.sgcTotal    ?? 0) + acc.contribGross;
+        row.returnAccum = (row.returnAccum ?? 0) + acc.grossReturn;
+        row.taxAccum    = (row.taxAccum    ?? 0) + acc.tax;
         // Grow any pension balance received via survivor transfer while still working
         if (st.pension > 0) {
           const p = pensionCompound(st.pension, returnRate);

@@ -223,6 +223,34 @@
     <p class="text-xs text-slate-400 mt-3">Current as at 20 March 2026 (Services Australia). Rates indexed twice yearly.</p>
   </section>
 
+  <!-- ════════════════════════════════ CALCULATION WORKINGS -->
+  <details id="workingsDetails" class="mt-5 rounded-2xl bg-white shadow-sm overflow-hidden">
+    <summary>
+      <span>Calculation workings</span>
+      <div class="flex items-center gap-3">
+        <button id="exportWorkingsBtn" class="text-xs px-3 py-1 rounded border border-slate-300 text-slate-600 bg-white hover:bg-slate-50" onclick="event.stopPropagation()">Export CSV</button>
+        <span class="chevron">▾</span>
+      </div>
+    </summary>
+    <div class="section-body !p-0">
+      <p class="text-xs text-slate-500 px-4 pt-3 pb-2">Year-by-year values matching the portfolio balance chart, with the formula used to derive each figure. Debt balance shown where applicable.</p>
+      <div class="overflow-x-auto">
+        <table id="workingsTable" class="workings-table w-full text-xs">
+          <thead>
+            <tr>
+              <th>Age</th>
+              <th>Phase</th>
+              <th>Portfolio balance</th>
+              <th id="debtColHeader" class="hidden">Debt remaining</th>
+              <th>How it was calculated</th>
+            </tr>
+          </thead>
+          <tbody id="workingsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+
   <!-- ════════════════════════════════ DISCLAIMER -->
   <section class="mt-5 text-xs text-slate-400 leading-relaxed max-w-4xl pb-8">
     <p><strong class="text-slate-500">Disclaimer:</strong> Projections illustrate outcomes from the inputs and assumptions you provide. They are not a guarantee of future performance. Tax, superannuation and social security laws change. This tool is for general information only and is not personal financial product advice. Darnell Consulting Pty Ltd.</p>

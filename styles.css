@@ -185,6 +185,47 @@ details > .section-body { padding: 1.25rem; display: flex; flex-direction: colum
 /* ── Chart legend dots ───────────────────────────────────── */
 .legend-dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; vertical-align: middle; margin-right: .3rem; }
 
+/* ── Calculation workings table ──────────────────────────── */
+.workings-table { border-collapse: collapse; font-size: .72rem; }
+.workings-table th {
+  background: rgba(27,42,78,.05);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-weight: 600;
+  padding: .5rem .75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+.workings-table td {
+  padding: .4rem .75rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.workings-table td.formula { white-space: normal; font-family: 'Courier New', monospace; color: #475569; line-height: 1.5; min-width: 28rem; }
+.workings-table td.balance { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--navy); }
+.workings-table td.debt-col { font-variant-numeric: tabular-nums; color: #dc2626; }
+.workings-table tbody tr:nth-child(even) { background: #fafafa; }
+.workings-table tbody tr.phase-change { background: rgba(27,42,78,.06) !important; }
+.workings-table tbody tr.event-row td { font-style: italic; }
+.workings-table .tag {
+  display: inline-block;
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  padding: .05rem .35rem;
+  border-radius: .25rem;
+  margin-left: .3rem;
+  vertical-align: middle;
+}
+.tag-accum   { background: #dbeafe; color: #1d4ed8; }
+.tag-drawdown{ background: #dcfce7; color: #15803d; }
+.tag-event   { background: #fef9c3; color: #854d0e; }
+
 /* ── Utilities ───────────────────────────────────────────── */
 .text-gold  { color: var(--gold2); }
 .text-navy  { color: var(--navy); }

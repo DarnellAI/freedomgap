@@ -51,6 +51,7 @@ function recalc() {
   updateChart(results);
   updateChartLegend(results);
   updateDebtChart(results);
+  if (primary) updateWorkingsTable(primary.result, primary.scenario.state);
   saveScenarios(scenarios);
 }
 
@@ -139,6 +140,130 @@ function updateOutputs(result) {
 function setText(id, text) {
   const el = document.getElementById(id);
   if (el) el.textContent = text ?? '—';
+}
+
+// ── Calculation workings table ─────────────────────────────────────────────────
+let workingsData = []; // kept for CSV export
+
+function updateWorkingsTable(result, state) {
+  const tbody = document.getElementById('workingsBody');
+  const debtHeader = document.getElementById('debtColHeader');
+  if (!tbody) return;
+
+  const r       = result.returnRate;
+  const rPct    = (r * 100).toFixed(1);
+  const maxAge  = result.planToAge ?? 95;
+  const hasDebt = (result.debtNames ?? []).length > 0;
+
+  if (debtHeader) debtHeader.classList.toggle('hidden', !hasDebt);
+
+  // dollar formatter — full precision for the table
+  function d(n) {
+    if (n == null || isNaN(n)) return '—';
+    const abs = Math.abs(n);
+    const s = abs >= 1e6 ? `$${(abs / 1e6).toFixed(3)}M`
+            : abs >= 1e3 ? `$${(abs / 1e3).toFixed(1)}k`
+            : `$${Math.round(abs)}`;
+    return n < 0 ? `−${s}` : s;
+  }
+
+  const rows = result.rows.filter(row => row.chartAge != null && row.chartAge <= maxAge);
+  workingsData = [];
+  tbody.innerHTML = '';
+
+  for (const row of rows) {
+    const inDrawdown = row.dd != null;
+    const age        = row.chartAge;
+    const wealth     = row.totalWealth ?? 0;
+    const totalDebt  = row.totalDebt ?? 0;
+
+    // ── Build formula string ─────────────────────────────────────────────────
+    let formula = '';
+    const events = [];
+    if (row.retirementStart)  events.push('Retirement begins');
+    if (row.sequencingShock)  events.push('−25% sequencing shock applied');
+    if (row.survivorEvent)    events.push('Survivor mode — partner deceased');
+    if (row.agedCareSetup)    events.push(`Aged care reserve: ${d(row.agedCareSetup)} set aside`);
+
+    if (!inDrawdown) {
+      // Accumulation
+      const superTotal = (row.accum0 ?? 0) + (row.pension0 ?? 0) + (row.accum1 ?? 0) + (row.pension1 ?? 0);
+      const nonSuper   = wealth - superTotal;
+      const sgc    = row.sgcTotal    ?? 0;
+      const ret    = row.returnAccum ?? 0;
+      const tax    = row.taxAccum    ?? 0;
+      const parts  = [];
+      if (sgc  > 0) parts.push(`+${d(sgc)} SGC (${(((state.shared.sgcRate ?? 0.12) * 100).toFixed(0))}%)`);
+      if (ret  > 0) parts.push(`+${d(ret)} growth (${rPct}%)`);
+      if (tax  > 0) parts.push(`−${d(tax)} contributions tax (15%)`);
+      if (totalDebt > 0) parts.push(`−${d(row.debtBalances?.reduce((s,_,i,a) => s + (a[i] ?? 0), 0) ?? 0)} debt balance`);
+      formula = `Super: ${d(superTotal)}${parts.length ? '  [' + parts.join('  ') + ']' : ''}`;
+      if (nonSuper > 0) formula += `  ·  Non-super: ${d(nonSuper)}`;
+    } else {
+      // Drawdown
+      const open   = row.startBalance ?? 0;
+      const growth = row.grossReturn  ?? 0;
+      const draw   = row.drawdownDraw ?? 0;
+      const pens   = row.pensionIncome ?? 0;
+      const debt   = totalDebt > 0 ? (draw - Math.max(0, draw - totalDebt)) : 0;
+      const close  = row.endBalance ?? 0;
+      formula = `${d(open)} opening  +${d(growth)} return (${rPct}%)  −${d(draw)} withdrawn`;
+      const breakdown = [];
+      if (pens > 0) breakdown.push(`Age Pension: ${d(pens)}/yr`);
+      if (row.debtBalances?.some(b => b > 0)) breakdown.push(`incl. debt repayments`);
+      if (row.minDrawdown > 0) breakdown.push(`min drawdown: ${d(row.minDrawdown)}`);
+      if (breakdown.length) formula += `  [${breakdown.join('  ·  ')}]`;
+      formula += `  =  ${d(Math.max(0, close))} closing`;
+    }
+
+    if (events.length) formula = events.join(' · ') + '  |  ' + formula;
+
+    // ── Phase label ──────────────────────────────────────────────────────────
+    const phaseLabel = inDrawdown ? `Drawdown yr ${row.dd}` : 'Accumulation';
+
+    // ── Store for CSV ────────────────────────────────────────────────────────
+    workingsData.push({ age, phase: phaseLabel, wealth, totalDebt, formula });
+
+    // ── DOM row ──────────────────────────────────────────────────────────────
+    const tr = document.createElement('tr');
+    if (row.retirementStart) tr.className = 'phase-change';
+
+    const phaseTag = inDrawdown
+      ? `<span class="tag tag-drawdown">Drawdown</span>`
+      : `<span class="tag tag-accum">Accumulation</span>`;
+    const eventTag = events.length ? `<span class="tag tag-event">Event</span>` : '';
+
+    tr.innerHTML = `
+      <td>${age}</td>
+      <td>${phaseTag}${eventTag}</td>
+      <td class="balance">${d(wealth)}</td>
+      ${hasDebt ? `<td class="debt-col">${totalDebt > 0 ? d(totalDebt) : '—'}</td>` : ''}
+      <td class="formula">${formula.replace(/</g, '&lt;')}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function exportWorkingsCSV() {
+  if (!workingsData.length) return;
+  const hasDebt = workingsData.some(r => r.totalDebt > 0);
+  const headers = ['Age', 'Phase', 'Portfolio Balance ($)', hasDebt ? 'Debt Remaining ($)' : null, 'Formula'].filter(Boolean);
+  const csvRows = [headers.join(',')];
+  for (const r of workingsData) {
+    const cols = [
+      r.age,
+      `"${r.phase}"`,
+      Math.round(r.wealth),
+      hasDebt ? Math.round(r.totalDebt) : null,
+      `"${r.formula.replace(/"/g, '""')}"`,
+    ].filter((_, i) => !(i === 3 && !hasDebt));
+    csvRows.push(cols.join(','));
+  }
+  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = 'freedom-gap-workings.csv';
+  a.click();
 }
 
 function updateChartLegend(results) {
@@ -253,6 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('exportBtn').addEventListener('click', () => exportJSON(scenarios));
+  document.getElementById('exportWorkingsBtn').addEventListener('click', () => exportWorkingsCSV());
 
   document.getElementById('importBtn').addEventListener('click', () => {
     importJSON(imported => {
