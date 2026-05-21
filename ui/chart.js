@@ -132,6 +132,26 @@ export function updateChart(scenarioResults) {
       });
     }
 
+    // Home equity line (estate context — indexed 3% p.a., not investable)
+    if ((result.initialHomeValue ?? 0) > 0) {
+      const homeData = ages.map(age => {
+        const row = result.rows.find(r => r.chartAge === age);
+        return row?.homeValue || null;
+      });
+      datasets.push({
+        label: 'Home equity',
+        data: homeData,
+        borderColor: '#C9A961',
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 2,
+        borderDash: [6, 3],
+      });
+    }
+
   }
 
   chartInstance.data.labels   = labels;

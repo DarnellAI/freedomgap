@@ -441,25 +441,75 @@ function renderDebtInputs(state, onChange) {
   }
 }
 
+function renderOneInheritance(inh, i, state, onChange) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'border-top:1px solid var(--border);padding-top:.6rem;display:flex;flex-direction:column;gap:.4rem;';
+
+  function up(key, val) { inh[key] = val; onChange(); }
+
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;gap:.5rem;';
+  const nameInp = document.createElement('input');
+  nameInp.type = 'text';
+  nameInp.value = inh.name ?? '';
+  nameInp.placeholder = `Inheritance ${i + 1} (e.g. Parents' estate)`;
+  nameInp.style.cssText = 'flex:1;padding:.3rem .5rem;border:1px solid var(--border);border-radius:.4rem;font-size:.82rem;background:var(--cream);color:var(--ink);';
+  nameInp.addEventListener('input', () => up('name', nameInp.value));
+  const removeBtn = document.createElement('button');
+  removeBtn.textContent = '✕';
+  removeBtn.title = 'Remove this inheritance';
+  removeBtn.style.cssText = 'padding:.2rem .55rem;border:1px solid #fca5a5;border-radius:.4rem;font-size:.75rem;cursor:pointer;color:#dc2626;background:none;';
+  removeBtn.addEventListener('click', () => {
+    state.inheritances.splice(i, 1);
+    renderInheritanceInputs(state, onChange);
+    onChange();
+  });
+  header.appendChild(nameInp);
+  header.appendChild(removeBtn);
+  wrap.appendChild(header);
+
+  [
+    makeRow('Expected amount (estimated, net of any tax)',       numInput(inh.amount, v => up('amount', v)), '$'),
+    makeRow('Received at age (Client 1\'s age when received)',   ageInput(inh.ageReceived ?? 75, v => up('ageReceived', v)), 'yrs'),
+    makeRow('Route to (where proceeds are invested)',            selectInput([['nonSuper','Investments'],['super','Superannuation']], inh.destination ?? 'nonSuper', v => up('destination', v))),
+    makeRow('Pay off debt first (highest-rate debt cleared before investing)', checkInput(inh.applyToDebtFirst ?? false, v => up('applyToDebtFirst', v))),
+  ].forEach(r => wrap.appendChild(r));
+  return wrap;
+}
+
 function renderInheritanceInputs(state, onChange) {
-  const inh = state.inheritance;
+  if (!state.inheritances) state.inheritances = [];
   const container = document.getElementById('inheritanceInputs');
   if (!container) return;
   container.innerHTML = '';
 
-  function up(key, val) { inh[key] = val; onChange(); }
+  const help = document.createElement('p');
+  help.className = 'help';
+  help.textContent = 'Expected inheritances or windfalls. Each is applied at Client 1\'s specified age and can pay down debt first before being invested.';
+  container.appendChild(help);
 
-  const rows = [
-    makeRow('Expected amount (estimated, net of any tax)',       numInput(inh.amount, v => up('amount', v)), '$'),
-    makeRow('Received at age (Client 1\'s age when received)',   ageInput(inh.ageReceived, v => up('ageReceived', v)), 'yrs'),
-    makeRow('Route to (where proceeds are invested)',            selectInput([['nonSuper','Investments'],['super','Superannuation']], inh.destination, v => up('destination', v))),
-  ];
-  rows.push(makeRow('Pay off debt first (highest-rate debt cleared before investing)', checkInput(inh.applyToDebtFirst ?? false, v => up('applyToDebtFirst', v))));
-  const note = document.createElement('p');
-  note.className = 'help';
-  note.textContent = 'Pays off outstanding debts (highest rate first) before routing the remainder.';
-  rows.push(note);
-  rows.forEach(r => container.appendChild(r));
+  if (state.inheritances.length === 0) {
+    const none = document.createElement('p');
+    none.className = 'help';
+    none.style.fontStyle = 'italic';
+    none.textContent = 'No inheritances added.';
+    container.appendChild(none);
+  } else {
+    state.inheritances.forEach((inh, i) => container.appendChild(renderOneInheritance(inh, i, state, onChange)));
+  }
+
+  if (state.inheritances.length < 5) {
+    const addBtn = document.createElement('button');
+    addBtn.className = 'scenario-add';
+    addBtn.style.marginTop = '.4rem';
+    addBtn.textContent = '+ Add inheritance';
+    addBtn.addEventListener('click', () => {
+      state.inheritances.push({ name: '', amount: 0, ageReceived: 75, destination: 'nonSuper', applyToDebtFirst: false });
+      renderInheritanceInputs(state, onChange);
+      onChange();
+    });
+    container.appendChild(addBtn);
+  }
 }
 
 function renderPensionInputs(state, onChange) {
@@ -472,9 +522,20 @@ function renderPensionInputs(state, onChange) {
 
   const rows = [
     makeRow('Include Age Pension (add government pension to retirement income)', checkInput(pen.include, v => up('include', v))),
-    makeRow('Homeowner (PPOR is exempt from asset test)',                        checkInput(pen.homeowner, v => up('homeowner', v))),
-    makeRow('Pension eligible age (currently 67 for most Australians)',          ageInput(pen.pensionAge, v => up('pensionAge', v)), 'yrs'),
+    makeRow('Homeowner (PPOR is exempt from asset test)', checkInput(pen.homeowner, v => {
+      pen.homeowner = v;
+      renderPensionInputs(state, onChange);
+      onChange();
+    })),
   ];
+  if (pen.homeowner) {
+    rows.push(makeRow('Current home value (indexed 3% p.a. — estate context only)', numInput(pen.homeValue ?? 0, v => up('homeValue', v)), '$'));
+    const homeHelp = document.createElement('p');
+    homeHelp.className = 'help';
+    homeHelp.textContent = 'Home equity grows at 3% p.a. and appears as a separate dashed line on the chart. It is not part of the investable portfolio — it shows you still have estate wealth even if the portfolio depletes.';
+    rows.push(homeHelp);
+  }
+  rows.push(makeRow('Pension eligible age (currently 67 for most Australians)', ageInput(pen.pensionAge, v => up('pensionAge', v)), 'yrs'));
   rows.forEach(r => container.appendChild(r));
 }
 

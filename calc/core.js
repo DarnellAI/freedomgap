@@ -33,8 +33,9 @@ export function runProjection(params, applySequencing = false) {
     rate: d.rate ?? 0.06,
     annualRep: (d.repayment ?? 0) * freqMult(d.frequency ?? 'monthly'),
   }));
-  const inh  = params.inheritance ?? { amount: 0, ageReceived: 75, destination: 'nonSuper' };
+  const inhList = params.inheritances ?? (params.inheritance ? [params.inheritance] : []);
   const pen  = params.pension ?? { include: true, homeowner: true, pensionAge: 67 };
+  const initialHomeValue = pen.homeValue ?? 0;
   const ac   = params.agedCare  ?? { active: false, amount: 500000, triggerAge: 85, mode: 'invested' };
   const surv = params.survivor  ?? { active: true, expenseFactor: 0.70 };
   const beq  = params.bequest   ?? { active: false, amount: 0 };
@@ -157,12 +158,14 @@ export function runProjection(params, applySequencing = false) {
       row[`pension${i}`] = st.pension;
     }
 
-    // ── Inheritance ────────────────────────────────────────────────────────────
-    const inhTriggerYear = inh.ageReceived - c[0].currentAge + 1;
-    if (inh.amount > 0 && t === inhTriggerYear) {
+    // ── Inheritances ───────────────────────────────────────────────────────────
+    let rowInhAmount = 0, rowInhDebtPayoff = 0, rowInhToPool = 0;
+    for (const inh of inhList) {
+      if (!inh.amount || inh.amount <= 0) continue;
+      const inhTriggerYear = (inh.ageReceived ?? 75) - c[0].currentAge + 1;
+      if (t !== inhTriggerYear) continue;
       let inhRemaining = inh.amount;
       let inhDebtPayoff = 0;
-      // Pay down debt first (highest rate first) if toggled
       if (inh.applyToDebtFirst) {
         const sorted = [...debtState].sort((a, b) => b.rate - a.rate);
         for (const db of sorted) {
@@ -175,22 +178,27 @@ export function runProjection(params, applySequencing = false) {
         row.debtBalances = debtState.map(db => db.balance);
         row.totalDebt    = row.debtBalances.reduce((s, v) => s + v, 0);
       }
-      row.inheritanceAmount    = inh.amount;
-      row.inheritanceDebtPayoff = inhDebtPayoff;
-      row.inheritanceToPool    = inhRemaining;
+      rowInhAmount     += inh.amount;
+      rowInhDebtPayoff += inhDebtPayoff;
+      rowInhToPool     += inhRemaining;
       if (inhRemaining > 0) {
         if (drawdownStarted) {
           combinedBal += inhRemaining;
         } else if (inh.destination === 'super') {
           const toSuper  = Math.min(inhRemaining, SUPER.nccAnnual);
           const toInvest = inhRemaining - toSuper;
-          const idx = cs[0].tbcUsed <= cs[1].tbcUsed ? 0 : 1;
-          cs[idx].accum += toSuper;
-          nonSuper      += toInvest;
+          const inhIdx = cs[0].tbcUsed <= cs[1].tbcUsed ? 0 : 1;
+          cs[inhIdx].accum += toSuper;
+          nonSuper         += toInvest;
         } else {
           nonSuper += inhRemaining;
         }
       }
+    }
+    if (rowInhAmount > 0) {
+      row.inheritanceAmount     = rowInhAmount;
+      row.inheritanceDebtPayoff = rowInhDebtPayoff;
+      row.inheritanceToPool     = rowInhToPool;
     }
 
     // ── Survivor check ─────────────────────────────────────────────────────────
@@ -445,6 +453,7 @@ export function runProjection(params, applySequencing = false) {
       row.totalWealth = cs.reduce((sum, st) => sum + st.pension + st.accum, 0) + nonSuper;
     }
 
+    row.homeValue = initialHomeValue > 0 ? Math.round(initialHomeValue * Math.pow(1.03, t - 1)) : 0;
     rows.push(row);
     cs.forEach(st => { if (st.alive) st.age++; });
   }
@@ -474,5 +483,6 @@ export function runProjection(params, applySequencing = false) {
     clientStartAges: [c[0].currentAge, c[1].currentAge],
     youngerStart: olderStart,
     drawdownStartAge,
+    initialHomeValue,
   };
 }

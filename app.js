@@ -31,9 +31,6 @@ function migrateState(state) {
     delete state.debt;
   }
   if (!state.debts) state.debts = [];
-  if (state.inheritance && state.inheritance.applyToDebtFirst === undefined) {
-    state.inheritance.applyToDebtFirst = false;
-  }
   // Migrate single desiredIncome → incomePhases array
   if (!state.shared.incomePhases) {
     state.shared.incomePhases = [{ income: state.shared.desiredIncome ?? 100000, untilAge: null }];
@@ -43,7 +40,19 @@ function migrateState(state) {
   if (!state.bequest)   state.bequest   = { active: false, amount: 0 };
   if (!state.agedCare)  state.agedCare  = { active: false, amount: 500000, triggerAge: 85, mode: 'invested' };
   if (!state.pension)   state.pension   = { include: true, homeowner: true, pensionAge: 67 };
-  if (!state.inheritance) state.inheritance = { amount: 0, ageReceived: 75, destination: 'nonSuper', applyToDebtFirst: false };
+  if (state.pension.homeValue === undefined) state.pension.homeValue = 0;
+  // Migrate old single inheritance → inheritances array
+  if (state.inheritance !== undefined && !state.inheritances) {
+    state.inheritances = (state.inheritance?.amount > 0) ? [{
+      name: '',
+      amount: state.inheritance.amount,
+      ageReceived: state.inheritance.ageReceived ?? 75,
+      destination: state.inheritance.destination ?? 'nonSuper',
+      applyToDebtFirst: state.inheritance.applyToDebtFirst ?? false,
+    }] : [];
+    delete state.inheritance;
+  }
+  if (!state.inheritances) state.inheritances = [];
   // Birth date and plan date (added for fractional age display)
   state.clients.forEach(cl => {
     if (cl.birthYear  === undefined) cl.birthYear  = null;
@@ -335,15 +344,20 @@ function exportWorkingsXLSX() {
     ['── AGE PENSION', ''],
     ['Included:', state.pension?.include ? 'Yes' : 'No'],
     ['Homeowner:', state.pension?.homeowner ? 'Yes' : 'No'],
+    ['Current home value:', state.pension?.homeValue > 0 ? state.pension.homeValue : 'Not set'],
     ['Eligibility age:', state.pension?.pensionAge ?? 67],
     [],
   ];
-  if (state.inheritance?.amount > 0) {
-    sum.push(['── INHERITANCE', '']);
-    sum.push(['Amount:', state.inheritance.amount]);
-    sum.push(['Age received (Client 1):', state.inheritance.ageReceived]);
-    sum.push(['Destination:', state.inheritance.destination]);
-    sum.push(['Apply to debt first:', state.inheritance.applyToDebtFirst ? 'Yes' : 'No']);
+  const validInhs = (state.inheritances ?? []).filter(inh => inh.amount > 0);
+  if (validInhs.length > 0) {
+    sum.push(['── INHERITANCES', '']);
+    for (const inh of validInhs) {
+      sum.push([inh.name || 'Inheritance', '']);
+      sum.push(['  Amount:', inh.amount]);
+      sum.push(['  Age received (Client 1):', inh.ageReceived]);
+      sum.push(['  Destination:', inh.destination]);
+      sum.push(['  Apply to debt first:', inh.applyToDebtFirst ? 'Yes' : 'No']);
+    }
     sum.push([]);
   }
   if (hasDebt) {
@@ -372,6 +386,7 @@ function exportWorkingsXLSX() {
   // Combined balance schedule driven by SGC contributions and investment returns.
   // Surplus cashflow from Sheet 3 is treated as an NCC contribution.
   // Portfolio drawdown from Sheet 3 reduces the balance.
+  const hasHomeValue = (state.pension?.homeValue ?? 0) > 0;
   const pb2Hdr = [
     'Age (C1/C2)', 'Phase',
     'Combined Starting Balance',
@@ -381,6 +396,7 @@ function exportWorkingsXLSX() {
     `Tax — ${n0}`, `Tax — ${n1}`,
     'Portfolio Drawdown',
     'Combined Ending Balance',
+    ...(hasHomeValue ? ['Home Equity (3% p.a.)'] : []),
   ];
   const pb2Body = validRows.map((row, idx) => {
     const inDD   = row.dd != null;
@@ -408,11 +424,13 @@ function exportWorkingsXLSX() {
       ageLabel(row.chartAge),
       inDD ? `Drawdown yr ${row.dd}` : 'Accumulation',
       startBal, sgc0, sgc1, surplus, ret0, ret1, tax0, tax1, draw, endBal,
+      ...(hasHomeValue ? [row.homeValue ?? 0] : []),
     ];
   });
   const ws2 = XLSX.utils.aoa_to_sheet([pb2Hdr, ...pb2Body]);
-  ws2['!cols'] = [{ wch: 12 }, { wch: 16 }, ...Array(10).fill({ wch: 22 })];
-  applyColFormat(ws2, Array.from({ length: 10 }, (_, i) => i + 2), CUR, pb2Body.length);
+  const pb2NumCols = hasHomeValue ? 11 : 10;
+  ws2['!cols'] = [{ wch: 12 }, { wch: 16 }, ...Array(pb2NumCols).fill({ wch: 22 })];
+  applyColFormat(ws2, Array.from({ length: pb2NumCols }, (_, i) => i + 2), CUR, pb2Body.length);
   XLSX.utils.book_append_sheet(wb, ws2, 'Portfolio Balance');
 
   // ── Sheet 3: Drawdowns (cashflow surplus / deficit) ─────────────────────────
@@ -578,7 +596,8 @@ function updateChartLegend(results) {
   const container = document.getElementById('chartLegend');
   if (!container) return;
   container.innerHTML = '';
-  for (const { scenario } of results) {
+  let hasHomeEquity = false;
+  for (const { scenario, result } of results) {
     if (!scenario.visible) continue;
     const wrap = document.createElement('span');
     wrap.className = 'flex items-center';
@@ -588,15 +607,15 @@ function updateChartLegend(results) {
     wrap.appendChild(dot);
     wrap.appendChild(document.createTextNode(scenario.name));
     container.appendChild(wrap);
+    if ((result.initialHomeValue ?? 0) > 0) hasHomeEquity = true;
   }
-  for (const [color, label] of []) {
+  if (hasHomeEquity) {
     const wrap = document.createElement('span');
     wrap.className = 'flex items-center';
-    const dot  = document.createElement('span');
-    dot.className = 'legend-dot';
-    dot.style.background = color;
-    wrap.appendChild(dot);
-    wrap.appendChild(document.createTextNode(label));
+    const line = document.createElement('span');
+    line.style.cssText = 'display:inline-block;width:1.6rem;height:2px;background:#C9A961;border-radius:1px;margin-right:.35rem;';
+    wrap.appendChild(line);
+    wrap.appendChild(document.createTextNode('Home equity'));
     container.appendChild(wrap);
   }
 }
@@ -658,9 +677,9 @@ const EXAMPLE = {
     { name: 'Client 2', gender: 'female', currentAge: 65, lifeExpectancy: 90, ftIncome: 85000,  ptAge: 68, ptIncome: 45000,  freedomAge: 72, superBalance: 185000, additionalConcessional: 0, downsizer: { active: false, amount: 0 } },
   ],
   shared:      { returnProfile: 'growth', sgcRate: 0.12, nonSuper: 0, desiredIncome: 140000, incomePhases: [{ income: 140000, untilAge: 80 }, { income: 90000, untilAge: null }], planToAge: 90, minDrawdownExcess: 'invest' },
-  debts:       [],
-  inheritance: { amount: 0, ageReceived: 75, destination: 'nonSuper', applyToDebtFirst: false },
-  pension:     { include: false, homeowner: true, pensionAge: 67 },
+  debts:        [],
+  inheritances: [],
+  pension:      { include: false, homeowner: true, pensionAge: 67, homeValue: 0 },
   agedCare:    { active: false, amount: 500000, triggerAge: 85, mode: 'invested' },
   survivor:    { active: false, expenseFactor: 0.70 },
   bequest:     { active: false, amount: 0 },

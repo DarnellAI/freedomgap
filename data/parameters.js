@@ -111,16 +111,12 @@ export const DEFAULT_STATE = {
     planDate: null,
   },
   debts: [],
-  inheritance: {
-    amount: 0,
-    ageReceived: 75,
-    destination: 'nonSuper',
-    applyToDebtFirst: false,
-  },
+  inheritances: [],
   pension: {
     include: true,
     homeowner: true,
     pensionAge: 67,
+    homeValue: 0,      // current market value; indexed at 3% p.a. for estate display only
   },
   agedCare: {
     active: false,
