@@ -89,17 +89,24 @@ export function renderScenarioTabs(
     dot.style.background = sc.color;
     tab.appendChild(dot);
 
-    // Name (editable on double-click)
+    // Name
     const nameSpan = document.createElement('span');
     nameSpan.className = 'sc-name';
     nameSpan.textContent = sc.name;
-    nameSpan.title = 'Double-click to rename';
-    nameSpan.addEventListener('dblclick', () => {
+    tab.appendChild(nameSpan);
+
+    // Pencil rename button
+    const editBtn = document.createElement('button');
+    editBtn.className = 'sc-edit';
+    editBtn.title = 'Rename scenario';
+    editBtn.textContent = '✎';
+    editBtn.addEventListener('click', e => {
+      e.stopPropagation();
       const inp = document.createElement('input');
       inp.value = sc.name;
-      inp.className = 'sc-rename';
-      inp.style.cssText = 'width:7rem;font-size:.8rem;border:none;border-bottom:1px solid currentColor;background:transparent;outline:none;';
+      inp.style.cssText = 'width:7rem;font-size:.8rem;border:none;border-bottom:1px solid currentColor;background:transparent;outline:none;color:inherit;';
       nameSpan.replaceWith(inp);
+      editBtn.style.display = 'none';
       inp.focus();
       inp.select();
       const finish = () => {
@@ -108,9 +115,9 @@ export function renderScenarioTabs(
         renderScenarioTabs(scenarios, activeId, onSelect, onAdd, onRemove, onVisibility, onSequencing);
       };
       inp.addEventListener('blur', finish);
-      inp.addEventListener('keydown', e => { if (e.key === 'Enter') finish(); });
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); finish(); } });
     });
-    tab.appendChild(nameSpan);
+    tab.appendChild(editBtn);
 
     // Click to activate
     tab.addEventListener('click', e => {

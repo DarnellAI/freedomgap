@@ -66,10 +66,10 @@ header p    { color: rgba(255,255,255,.65); font-size: .85rem; }
   font-weight: 600;
 }
 .sc-dot  { width: .65rem; height: .65rem; border-radius: 50%; flex-shrink: 0; }
-.sc-vis, .sc-remove {
+.sc-vis, .sc-remove, .sc-edit {
   background: none; border: none; cursor: pointer; font-size: .85rem; line-height: 1; padding: 0 .1rem; opacity: .6;
 }
-.sc-vis:hover, .sc-remove:hover { opacity: 1; }
+.sc-vis:hover, .sc-remove:hover, .sc-edit:hover { opacity: 1; }
 .scenario-add {
   padding: .4rem .75rem;
   border-radius: 2rem;
