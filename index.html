@@ -29,6 +29,60 @@
 </head>
 <body class="bg-[#FAF7F0] text-slate-900 antialiased font-sans">
 
+<!-- ════════════════════════════════════════════════ DISCLAIMER MODAL -->
+<div id="disclaimerOverlay" style="position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,0.82);display:flex;align-items:center;justify-content:center;padding:1rem;">
+  <div style="background:#fff;border-radius:1rem;max-width:640px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 25px 60px rgba(0,0,0,0.4);">
+    <!-- Header -->
+    <div style="background:#1B2A4E;border-radius:1rem 1rem 0 0;padding:1.25rem 1.5rem;display:flex;align-items:center;gap:.75rem;flex-shrink:0;">
+      <span style="font-size:1.6rem;">🦘</span>
+      <div>
+        <div style="color:#fff;font-family:'Playfair Display',Georgia,serif;font-size:1.1rem;font-weight:700;">Freedom Gap Calculator</div>
+        <div style="color:rgba(255,255,255,.6);font-size:.75rem;">Darnell Consulting · Important Notice</div>
+      </div>
+    </div>
+    <!-- Body -->
+    <div style="overflow-y:auto;padding:1.5rem;flex:1;font-size:.82rem;line-height:1.65;color:#334155;">
+      <p style="font-weight:700;font-size:.95rem;color:#1B2A4E;margin-bottom:.75rem;">General Advice Warning &amp; Terms of Use</p>
+      <p style="margin-bottom:.75rem;">This tool is provided by <strong>Darnell Consulting Pty Ltd</strong> for <strong>general information purposes only</strong>. It does not constitute personal financial product advice within the meaning of the <em>Corporations Act 2001</em> (Cth) and must not be treated as such. It has been prepared without taking into account your individual financial situation, investment objectives, tax position, risk tolerance, or personal needs.</p>
+      <p style="margin-bottom:.75rem;">The projections generated are <strong>hypothetical illustrations</strong> based solely on the assumptions and inputs provided. They are not a guarantee, prediction, or reliable indicator of future financial outcomes. Actual results may differ materially due to changes in investment returns, inflation, superannuation legislation, taxation law, social security policy, and personal circumstances.</p>
+      <p style="font-weight:600;color:#1B2A4E;margin-bottom:.4rem;">By clicking "I Agree &amp; Proceed" you acknowledge and agree that:</p>
+      <ol style="padding-left:1.25rem;margin-bottom:.75rem;display:flex;flex-direction:column;gap:.4rem;">
+        <li>You will <strong>not act solely on any output of this calculator</strong> without first obtaining personal financial advice from a licensed financial adviser holding a current Australian Financial Services Licence (AFSL).</li>
+        <li>Darnell Consulting Pty Ltd, its authorised representatives, directors, and related entities <strong>accept no liability</strong> for any loss or damage arising directly or indirectly from your use of, or reliance on, this tool.</li>
+        <li>Superannuation, taxation, and social security laws are subject to change. All rates and thresholds should be <strong>verified with a qualified professional</strong> before any financial decision is made.</li>
+        <li>This tool does not replace a Statement of Advice (SOA) prepared by a licensed adviser and is not intended to do so.</li>
+        <li>Past performance is not indicative of future performance. All projections assume constant rates which will not reflect real-world conditions.</li>
+      </ol>
+      <p style="color:#64748b;font-size:.75rem;">This notice is displayed in accordance with ASIC Regulatory Guide 244 and the general advice obligations under s949A of the <em>Corporations Act 2001</em> (Cth). Darnell Consulting Pty Ltd. All rights reserved.</p>
+    </div>
+    <!-- Footer -->
+    <div style="padding:1rem 1.5rem;border-top:1px solid #e2e8f0;background:#f8fafc;border-radius:0 0 1rem 1rem;flex-shrink:0;">
+      <label style="display:flex;align-items:flex-start;gap:.6rem;cursor:pointer;margin-bottom:.85rem;font-size:.82rem;color:#334155;">
+        <input type="checkbox" id="disclaimerCheck" style="margin-top:.15rem;width:1rem;height:1rem;accent-color:#1B2A4E;flex-shrink:0;" onchange="document.getElementById('disclaimerAgree').disabled=!this.checked;">
+        <span>I have read and understood the above, and I agree to these terms before accessing the calculator.</span>
+      </label>
+      <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
+        <button id="disclaimerAgree" disabled
+          onclick="document.getElementById('disclaimerOverlay').style.display='none';"
+          style="flex:1;padding:.65rem 1.25rem;background:#1B2A4E;color:#fff;border:none;border-radius:.5rem;font-size:.85rem;font-weight:600;cursor:pointer;opacity:.4;transition:opacity .15s;"
+          onmouseover="if(!this.disabled)this.style.background='#243860';" onmouseout="this.style.background='#1B2A4E';">
+          I Agree &amp; Proceed to Calculator
+        </button>
+        <a href="https://www.darnellconsulting.com.au" style="font-size:.75rem;color:#64748b;white-space:nowrap;">I do not agree — exit</a>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  // Enable button when checkbox ticked
+  document.getElementById('disclaimerCheck').addEventListener('change', function() {
+    const btn = document.getElementById('disclaimerAgree');
+    btn.disabled = !this.checked;
+    btn.style.opacity = this.checked ? '1' : '.4';
+    btn.style.cursor  = this.checked ? 'pointer' : 'default';
+  });
+</script>
+
 <!-- ════════════════════════════════════════════════ HEADER -->
 <header class="bg-[#1B2A4E] text-white">
   <div class="max-w-screen-xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
