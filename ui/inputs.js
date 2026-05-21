@@ -1,6 +1,7 @@
 // Input sidebar renderer — Darnell brand, collapsible sections
 
 import { RETURN_PROFILES } from '../data/parameters.js';
+import { calcNetIncome } from '../calc/tax.js';
 
 function dollar(v)  { return v == null ? '' : Math.round(v).toString(); }
 function pct(v)     { return v == null ? '' : (v * 100).toFixed(1); }
@@ -98,6 +99,22 @@ function subhead(text) {
   return p;
 }
 
+function fmtK(n) {
+  if (!n) return '$0';
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}k`;
+  return `$${Math.round(n)}`;
+}
+
+function netHelp(gross) {
+  const p = document.createElement('p');
+  p.className = 'help net-help';
+  const net = calcNetIncome(gross);
+  const tax = gross - net;
+  p.textContent = `Net take-home: ~${fmtK(net)}/yr  (tax: ~${fmtK(tax)})`;
+  return p;
+}
+
 function textInput(value, onInput) {
   const inp = document.createElement('input');
   inp.type = 'text';
@@ -137,10 +154,12 @@ function renderClientInputs(idx, state, onChange) {
     makeRow('Gender',            selectInput([['male','Male'],['female','Female']], cli.gender, v => up('gender', v))),
     makeRow('Current age',       ageInput(cli.currentAge, v => up('currentAge', v)), 'yrs'),
     makeRow('Life expectancy',   ageInput(cli.lifeExpectancy, v => up('lifeExpectancy', v)), 'yrs'),
-    subhead('Income'),
+    subhead('Income (gross — employer super is additional)'),
     makeRow('Full-time income',  numInput(cli.ftIncome, v => up('ftIncome', v)), '$/yr'),
+    netHelp(cli.ftIncome),
     makeRow('Part-time from age',ageInput(cli.ptAge, v => up('ptAge', v)), 'yrs'),
     makeRow('Part-time income',  numInput(cli.ptIncome, v => up('ptIncome', v)), '$/yr'),
+    netHelp(cli.ptIncome),
     makeRow('Freedom age',       ageInput(cli.freedomAge, v => up('freedomAge', v)), 'yrs'),
     subhead('Superannuation'),
     makeRow('Super balance',     numInput(cli.superBalance, v => up('superBalance', v)), '$'),
@@ -164,10 +183,21 @@ function renderSharedInputs(state, onChange) {
 
   const profileOptions = RETURN_PROFILES.map(p => [p.id, `${p.label} (${(p.rate * 100).toFixed(1)}%)`]);
 
+  // Replacement ratio: desired retirement income vs combined current net pay
+  const c = state.clients;
+  const netFt0 = calcNetIncome(c[0].ftIncome);
+  const netFt1 = calcNetIncome(c[1].ftIncome);
+  const combinedNet = netFt0 + netFt1;
+  const ratio = combinedNet > 0 ? (s.desiredIncome / combinedNet * 100).toFixed(0) : '—';
+  const replNote = document.createElement('p');
+  replNote.className = 'help net-help';
+  replNote.textContent = `Combined current net: ~${fmtK(combinedNet)}/yr · Replacement ratio: ${ratio}%`;
+
   const rows = [
     makeRow('Return profile',      selectInput(profileOptions, s.returnProfile, v => up('returnProfile', v))),
     makeRow('SGC rate',            pctInput(s.sgcRate, v => up('sgcRate', v)), '%'),
     makeRow('Desired income',      numInput(s.desiredIncome, v => up('desiredIncome', v)), '$/yr'),
+    replNote,
     makeRow('Non-super savings',   numInput(s.nonSuper, v => up('nonSuper', v)), '$'),
     makeRow('Plan to age',         ageInput(s.planToAge, v => up('planToAge', v)), 'yrs'),
     subhead('Inflation: fixed at 2.5%'),

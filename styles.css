@@ -144,6 +144,7 @@ input[type=number] { -moz-appearance: textfield; }
 
 /* ── Help text ───────────────────────────────────────────── */
 .help { font-size: .7rem; color: var(--muted); line-height: 1.5; }
+.net-help { color: var(--gold2); font-weight: 500; }
 
 /* ── Details/summary collapsible ─────────────────────────── */
 details > summary {
