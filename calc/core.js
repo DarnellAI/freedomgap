@@ -65,6 +65,7 @@ export function runProjection(params, applySequencing = false) {
   let bothAlive      = true;
   let drawdownStarted = false;
   let drawdownYear   = 0;
+  let drawdownStartAge = null;
   let combinedBal    = 0;
   let pensionBal     = 0;  // pension phase portion within combinedBal (for min-drawdown tracking)
   let depletionAge   = null;
@@ -238,6 +239,7 @@ export function runProjection(params, applySequencing = false) {
                     + nonSuper;
         retirementCombined = combinedBal;
         drawdownStarted    = true;
+        drawdownStartAge   = chartAge;
         row.retirementStart = true;
       }
     }
@@ -361,15 +363,19 @@ export function runProjection(params, applySequencing = false) {
       // Min drawdown enforcement
       const oldestAliveAge = Math.max(...cs.filter(s => s.alive).map(s => s.age));
       const minDraw = minDrawdownAmount(pensionBal, oldestAliveAge);
-      // Debt repayments are added on top of desired income until each debt is cleared
-      const netDraw = Math.max(0, desiredNominal - pensionIncome - workingNetIncome) + debtRepaymentThisYear;
+      // Net portfolio flow: inflows offset outflows; surplus is saved back into the pool
+      const totalInflow   = pensionIncome + workingNetIncome;
+      const totalOutflow  = desiredNominal + debtRepaymentThisYear;
+      const netDraw       = Math.max(0, totalOutflow - totalInflow);
+      const surplusSaving = Math.max(0, totalInflow - totalOutflow);
       const excessMinDraw = Math.max(0, minDraw - netDraw);
       const effectiveDraw = netDraw;
-      row.minDrawdown = minDraw;
+      row.minDrawdown   = minDraw;
       row.excessMinDraw = excessMinDraw;
+      row.surplusSaving = surplusSaving;
 
       const grossReturn = combinedBal * returnRate;
-      const newBal      = combinedBal + grossReturn - effectiveDraw;
+      const newBal      = combinedBal + grossReturn - effectiveDraw + surplusSaving;
 
       row.dd              = drawdownYear;
       row.startBalance    = combinedBal;
@@ -425,5 +431,6 @@ export function runProjection(params, applySequencing = false) {
     safeEarnSingle: safeEarnAmount(false),
     clientStartAges: [c[0].currentAge, c[1].currentAge],
     youngerStart: olderStart,
+    drawdownStartAge,
   };
 }
