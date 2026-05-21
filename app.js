@@ -140,6 +140,24 @@ function updateOutputs(result) {
     sub.textContent   = `Funds deplete ~${gap_yrs} year${gap_yrs !== 1 ? 's' : ''} before plan-to age ${planTo}`;
   }
 
+  // Home equity on risk card — shows estate backstop even if portfolio depletes
+  const homeEquityEl = document.getElementById('homeEquityLine');
+  if (homeEquityEl) {
+    const homeVal = result.initialHomeValue ?? 0;
+    if (homeVal > 0) {
+      const displayAge = (depletionAge && depletionAge < planTo) ? depletionAge : planTo;
+      const ageRow = result.rows.find(r => r.chartAge === displayAge) ?? result.rows[result.rows.length - 1];
+      const heVal  = ageRow?.homeValue ?? 0;
+      const label  = (depletionAge && depletionAge < planTo)
+        ? `Home equity at depletion (age ${displayAge}): ~${fmt(heVal)}`
+        : `Home equity at age ${displayAge}: ~${fmt(heVal)}`;
+      homeEquityEl.textContent = label;
+      homeEquityEl.classList.remove('hidden');
+    } else {
+      homeEquityEl.classList.add('hidden');
+    }
+  }
+
   // Opening balance / self-funded gap card
   setText('gapAmount',    gap > 0 ? fmt(gap) : 'Self-funded ✓');
   setText('balAmount',    fmt(retirementBalance));
@@ -596,8 +614,7 @@ function updateChartLegend(results) {
   const container = document.getElementById('chartLegend');
   if (!container) return;
   container.innerHTML = '';
-  let hasHomeEquity = false;
-  for (const { scenario, result } of results) {
+  for (const { scenario } of results) {
     if (!scenario.visible) continue;
     const wrap = document.createElement('span');
     wrap.className = 'flex items-center';
@@ -606,16 +623,6 @@ function updateChartLegend(results) {
     dot.style.background = scenario.color;
     wrap.appendChild(dot);
     wrap.appendChild(document.createTextNode(scenario.name));
-    container.appendChild(wrap);
-    if ((result.initialHomeValue ?? 0) > 0) hasHomeEquity = true;
-  }
-  if (hasHomeEquity) {
-    const wrap = document.createElement('span');
-    wrap.className = 'flex items-center';
-    const line = document.createElement('span');
-    line.style.cssText = 'display:inline-block;width:1.6rem;height:2px;background:#C9A961;border-radius:1px;margin-right:.35rem;';
-    wrap.appendChild(line);
-    wrap.appendChild(document.createTextNode('Home equity'));
     container.appendChild(wrap);
   }
 }
