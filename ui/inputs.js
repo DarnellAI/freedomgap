@@ -162,21 +162,21 @@ function renderClientInputs(idx, state, onChange) {
   function upDz(key, val) { cli.downsizer[key] = val; onChange(); }
 
   const rows = [
-    makeRow('Name',              textInput(cli.name, v => up('name', v))),
-    makeRow('Gender',            selectInput([['male','Male'],['female','Female']], cli.gender, v => up('gender', v))),
-    makeRow('Current age',       ageInput(cli.currentAge, v => up('currentAge', v)), 'yrs'),
-    makeRow('Life expectancy',   ageInput(cli.lifeExpectancy, v => up('lifeExpectancy', v)), 'yrs'),
-    subhead('Income (gross — employer super is additional)'),
-    makeRow('Full-time income',  numInput(cli.ftIncome, v => up('ftIncome', v)), '$/yr'),
+    makeRow('Name (report display)',              textInput(cli.name, v => up('name', v))),
+    makeRow('Gender (life expectancy default)',   selectInput([['male','Male'],['female','Female']], cli.gender, v => up('gender', v))),
+    makeRow('Current age (today)',               ageInput(cli.currentAge, v => up('currentAge', v)), 'yrs'),
+    makeRow('Life expectancy (planning horizon, not a medical prediction)', ageInput(cli.lifeExpectancy, v => up('lifeExpectancy', v)), 'yrs'),
+    subhead('Income — gross, before tax. Employer super is paid on top.'),
+    makeRow('Full-time income (gross, before tax)',  numInput(cli.ftIncome, v => up('ftIncome', v)), '$/yr'),
     netHelp(cli.ftIncome),
-    makeRow('Part-time from age',ageInput(cli.ptAge, v => up('ptAge', v)), 'yrs'),
-    makeRow('Part-time income',  numInput(cli.ptIncome, v => up('ptIncome', v)), '$/yr'),
+    makeRow('Part-time from age (when hours reduce)', ageInput(cli.ptAge, v => up('ptAge', v)), 'yrs'),
+    makeRow('Part-time income (gross at reduced hours)', numInput(cli.ptIncome, v => up('ptIncome', v)), '$/yr'),
     netHelp(cli.ptIncome),
-    makeRow('Freedom age',       ageInput(cli.freedomAge, v => up('freedomAge', v)), 'yrs'),
+    makeRow('Freedom age (earliest possible retirement)', ageInput(cli.freedomAge, v => up('freedomAge', v)), 'yrs'),
     subhead('Superannuation'),
-    makeRow('Super balance',     numInput(cli.superBalance, v => up('superBalance', v)), '$'),
-    makeRow('Extra concessional',numInput(cli.additionalConcessional, v => up('additionalConcessional', v)), '$/yr'),
-    subhead('Downsizer contribution'),
+    makeRow('Super balance (current total, all funds)', numInput(cli.superBalance, v => up('superBalance', v)), '$'),
+    makeRow('Extra concessional (salary sacrifice or personal deductible, up to cap)', numInput(cli.additionalConcessional, v => up('additionalConcessional', v)), '$/yr'),
+    subhead('Downsizer contribution (from sale of family home, age 55+)'),
     makeRow('Downsizer active',  checkInput(cli.downsizer.active, v => {
       cli.downsizer.active = v;
       renderClientInputs(idx, state, onChange);
@@ -184,9 +184,116 @@ function renderClientInputs(idx, state, onChange) {
     })),
   ];
   if (cli.downsizer.active) {
-    rows.push(makeRow('Downsizer amount', numInput(cli.downsizer.amount, v => upDz('amount', v)), '$'));
+    rows.push(makeRow('Downsizer amount (max $300k per person)', numInput(cli.downsizer.amount, v => upDz('amount', v)), '$'));
   }
   rows.forEach(r => container.appendChild(r));
+}
+
+function renderIncomePhases(state, container, onChange) {
+  // Remove any existing phases block and rebuild in place
+  let block = container.querySelector('.income-phases-block');
+  if (block) block.remove();
+  block = document.createElement('div');
+  block.className = 'income-phases-block';
+  block.style.cssText = 'display:flex;flex-direction:column;gap:.5rem;';
+
+  const s = state.shared;
+  if (!s.incomePhases || s.incomePhases.length === 0) {
+    s.incomePhases = [{ income: s.desiredIncome ?? 100000, untilAge: null }];
+  }
+  const phases = s.incomePhases;
+
+  subhead('Retirement income (today\'s dollars)');
+  const hdr = document.createElement('p');
+  hdr.className = 'subhead';
+  hdr.textContent = 'Retirement income (today\'s dollars, excl. debt repayments)';
+  block.appendChild(hdr);
+
+  const hint = document.createElement('p');
+  hint.className = 'help';
+  hint.textContent = 'Add phases to model the go-go / slow-go / no-go spending pattern. Each amount is in today\'s dollars and inflated automatically.';
+  block.appendChild(hint);
+
+  phases.forEach((phase, i) => {
+    const isLast = i === phases.length - 1;
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;';
+
+    const lbl = document.createElement('span');
+    lbl.style.cssText = 'font-size:.75rem;color:var(--muted);width:4.5rem;flex-shrink:0;';
+    lbl.textContent = `Phase ${i + 1}`;
+    row.appendChild(lbl);
+
+    const incInp = numInput(phase.income, v => { phase.income = v; s.desiredIncome = phases[0].income; onChange(); });
+    incInp.style.width = '8.5rem';
+    row.appendChild(incInp);
+
+    const yrSpan = document.createElement('span');
+    yrSpan.style.cssText = 'font-size:.75rem;color:var(--muted);';
+    yrSpan.textContent = '/yr';
+    row.appendChild(yrSpan);
+
+    if (!isLast) {
+      const untilLbl = document.createElement('span');
+      untilLbl.style.cssText = 'font-size:.75rem;color:var(--muted);';
+      untilLbl.textContent = 'until age';
+      row.appendChild(untilLbl);
+
+      const ageInp = ageInput(phase.untilAge ?? 75, v => { phase.untilAge = v; onChange(); });
+      ageInp.style.width = '4rem';
+      row.appendChild(ageInp);
+    } else {
+      const onw = document.createElement('span');
+      onw.style.cssText = 'font-size:.75rem;color:var(--muted);font-style:italic;';
+      onw.textContent = 'onwards';
+      row.appendChild(onw);
+    }
+
+    if (phases.length > 1) {
+      const rm = document.createElement('button');
+      rm.textContent = '✕';
+      rm.style.cssText = 'margin-left:auto;padding:.15rem .45rem;border:1px solid #fca5a5;border-radius:.35rem;font-size:.7rem;cursor:pointer;color:#dc2626;background:none;';
+      rm.addEventListener('click', () => {
+        phases.splice(i, 1);
+        if (phases.length === 1) phases[0].untilAge = null;
+        s.desiredIncome = phases[0].income;
+        renderIncomePhases(state, container, onChange);
+        onChange();
+      });
+      row.appendChild(rm);
+    }
+    block.appendChild(row);
+  });
+
+  // Replacement ratio note
+  const c = state.clients;
+  const combinedNet = calcNetIncome(c[0].ftIncome) + calcNetIncome(c[1].ftIncome);
+  const firstIncome = phases[0]?.income ?? 0;
+  const ratio = combinedNet > 0 ? (firstIncome / combinedNet * 100).toFixed(0) : '—';
+  const replNote = document.createElement('p');
+  replNote.className = 'help net-help';
+  replNote.textContent = `Combined current net: ~${fmtK(combinedNet)}/yr · Replacement ratio (phase 1): ${ratio}%`;
+  block.appendChild(replNote);
+
+  if (phases.length < 3) {
+    const addBtn = document.createElement('button');
+    addBtn.className = 'scenario-add';
+    addBtn.style.marginTop = '.2rem';
+    addBtn.textContent = '+ Add income phase';
+    addBtn.addEventListener('click', () => {
+      const prev = phases[phases.length - 1];
+      prev.untilAge = prev.untilAge ?? 75;
+      phases.push({ income: Math.round((prev.income ?? 100000) * 0.6), untilAge: null });
+      renderIncomePhases(state, container, onChange);
+      onChange();
+    });
+    block.appendChild(addBtn);
+  }
+
+  // Insert after the SGC row (second child) — find the right insertion point
+  const sgcRow = container.querySelector('[data-field="sgc"]');
+  if (sgcRow) sgcRow.after(block);
+  else container.appendChild(block);
 }
 
 function renderSharedInputs(state, onChange) {
@@ -199,27 +306,18 @@ function renderSharedInputs(state, onChange) {
 
   const profileOptions = RETURN_PROFILES.map(p => [p.id, `${p.label} (${(p.rate * 100).toFixed(1)}%)`]);
 
-  // Replacement ratio: desired retirement income vs combined current net pay
-  const c = state.clients;
-  const netFt0 = calcNetIncome(c[0].ftIncome);
-  const netFt1 = calcNetIncome(c[1].ftIncome);
-  const combinedNet = netFt0 + netFt1;
-  const ratio = combinedNet > 0 ? (s.desiredIncome / combinedNet * 100).toFixed(0) : '—';
-  const replNote = document.createElement('p');
-  replNote.className = 'help net-help';
-  replNote.textContent = `Combined current net: ~${fmtK(combinedNet)}/yr · Replacement ratio: ${ratio}%`;
+  const sgcRow = makeRow('SGC rate (employer super, legislated 12% from Jul 2025)', pctInput(s.sgcRate, v => up('sgcRate', v)), '%');
+  sgcRow.dataset.field = 'sgc';
 
   const rows = [
-    makeRow('Return profile',      selectInput(profileOptions, s.returnProfile, v => up('returnProfile', v))),
-    makeRow('SGC rate',            pctInput(s.sgcRate, v => up('sgcRate', v)), '%'),
-    makeRow('Desired income',      numInput(s.desiredIncome, v => up('desiredIncome', v)), '$/yr'),
-    replNote,
-    (() => { const p = document.createElement('p'); p.className = 'help'; p.textContent = 'Excludes debt repayments — these are added on top automatically.'; return p; })(),
-    makeRow('Non-super savings',   numInput(s.nonSuper, v => up('nonSuper', v)), '$'),
-    makeRow('Plan to age',         ageInput(s.planToAge, v => up('planToAge', v)), 'yrs'),
-    subhead('Inflation: fixed at 2.5%'),
+    makeRow('Return profile (expected net annual portfolio return)', selectInput(profileOptions, s.returnProfile, v => up('returnProfile', v))),
+    sgcRow,
+    makeRow('Non-super savings (cash, ETFs, investment property equity, etc.)', numInput(s.nonSuper, v => up('nonSuper', v)), '$'),
+    makeRow('Plan to age (projection end — use 90–95 for conservative planning)', ageInput(s.planToAge, v => up('planToAge', v)), 'yrs'),
+    subhead('Inflation: fixed at 2.5% · Pension indexation: 2.0%'),
   ];
   rows.forEach(r => container.appendChild(r));
+  renderIncomePhases(state, container, onChange);
 }
 
 function renderOneDebt(d, i, state, onChange) {
@@ -251,10 +349,10 @@ function renderOneDebt(d, i, state, onChange) {
 
   const freqOpts = [['weekly','Weekly'],['fortnightly','Fortnightly'],['monthly','Monthly'],['annual','Annual']];
   [
-    makeRow('Balance',       numInput(d.balance,   v => up('balance', v)),   '$'),
-    makeRow('Interest rate', pctInput(d.rate,      v => up('rate', v)),      '%'),
-    makeRow('Repayment',     numInput(d.repayment, v => up('repayment', v)), '$'),
-    makeRow('Frequency',     selectInput(freqOpts, d.frequency ?? 'monthly', v => up('frequency', v))),
+    makeRow('Balance (current outstanding)',             numInput(d.balance,   v => up('balance', v)),   '$'),
+    makeRow('Interest rate (annual, e.g. 5.50%)',       pctInput(d.rate,      v => up('rate', v)),      '%'),
+    makeRow('Repayment (your regular payment amount)',  numInput(d.repayment, v => up('repayment', v)), '$'),
+    makeRow('Frequency (how often you repay)',          selectInput(freqOpts, d.frequency ?? 'monthly', v => up('frequency', v))),
   ].forEach(r => wrap.appendChild(r));
   return wrap;
 }
@@ -303,11 +401,11 @@ function renderInheritanceInputs(state, onChange) {
   function up(key, val) { inh[key] = val; onChange(); }
 
   const rows = [
-    makeRow('Expected amount',      numInput(inh.amount, v => up('amount', v)), '$'),
-    makeRow('Received at age',      ageInput(inh.ageReceived, v => up('ageReceived', v)), 'yrs'),
-    makeRow('Route to',             selectInput([['nonSuper','Investments'],['super','Superannuation']], inh.destination, v => up('destination', v))),
+    makeRow('Expected amount (estimated, net of any tax)',       numInput(inh.amount, v => up('amount', v)), '$'),
+    makeRow('Received at age (Client 1\'s age when received)',   ageInput(inh.ageReceived, v => up('ageReceived', v)), 'yrs'),
+    makeRow('Route to (where proceeds are invested)',            selectInput([['nonSuper','Investments'],['super','Superannuation']], inh.destination, v => up('destination', v))),
   ];
-  rows.push(makeRow('Pay off debt first', checkInput(inh.applyToDebtFirst ?? false, v => up('applyToDebtFirst', v))));
+  rows.push(makeRow('Pay off debt first (highest-rate debt cleared before investing)', checkInput(inh.applyToDebtFirst ?? false, v => up('applyToDebtFirst', v))));
   const note = document.createElement('p');
   note.className = 'help';
   note.textContent = 'Pays off outstanding debts (highest rate first) before routing the remainder.';
@@ -324,9 +422,9 @@ function renderPensionInputs(state, onChange) {
   function up(key, val) { pen[key] = val; onChange(); }
 
   const rows = [
-    makeRow('Include Age Pension',  checkInput(pen.include, v => up('include', v))),
-    makeRow('Homeowner',            checkInput(pen.homeowner, v => up('homeowner', v))),
-    makeRow('Pension eligible age', ageInput(pen.pensionAge, v => up('pensionAge', v)), 'yrs'),
+    makeRow('Include Age Pension (add government pension to retirement income)', checkInput(pen.include, v => up('include', v))),
+    makeRow('Homeowner (PPOR is exempt from asset test)',                        checkInput(pen.homeowner, v => up('homeowner', v))),
+    makeRow('Pension eligible age (currently 67 for most Australians)',          ageInput(pen.pensionAge, v => up('pensionAge', v)), 'yrs'),
   ];
   rows.forEach(r => container.appendChild(r));
 }
@@ -340,7 +438,7 @@ function renderAgedCareInputs(state, onChange) {
   function up(key, val) { ac[key] = val; onChange(); }
 
   const rows = [
-    makeRow('Reserve for aged care', checkInput(ac.active, v => {
+    makeRow('Reserve for aged care (set aside funds for future residential care)', checkInput(ac.active, v => {
       ac.active = v;
       renderAgedCareInputs(state, onChange);
       onChange();
@@ -348,9 +446,9 @@ function renderAgedCareInputs(state, onChange) {
   ];
   if (ac.active) {
     rows.push(
-      makeRow('Amount reserved',  numInput(ac.amount, v => up('amount', v)), '$'),
-      makeRow('From age',         ageInput(ac.triggerAge, v => up('triggerAge', v)), 'yrs'),
-      makeRow('Treatment',        selectInput([['invested','Invested (earns return)'],['rad','RAD bond (0% return)']], ac.mode, v => up('mode', v))),
+      makeRow('Amount reserved (estimate of RAD / accommodation deposit)',        numInput(ac.amount, v => up('amount', v)), '$'),
+      makeRow('From age (when the reserve is activated)',                         ageInput(ac.triggerAge, v => up('triggerAge', v)), 'yrs'),
+      makeRow('Treatment (invested earns return; RAD bond is lodged at 0%)',      selectInput([['invested','Invested (earns return)'],['rad','RAD bond (0% return)']], ac.mode, v => up('mode', v))),
     );
   }
   rows.forEach(r => container.appendChild(r));
@@ -365,7 +463,7 @@ function renderSurvivorInputs(state, onChange) {
   function up(key, val) { surv[key] = val; onChange(); }
 
   const rows = [
-    makeRow('Model survivor scenario', checkInput(surv.active, v => {
+    makeRow('Model survivor scenario (financial impact of partner\'s death)', checkInput(surv.active, v => {
       surv.active = v;
       renderSurvivorInputs(state, onChange);
       onChange();
@@ -373,7 +471,7 @@ function renderSurvivorInputs(state, onChange) {
   ];
   if (surv.active) {
     rows.push(
-      makeRow('Survivor expense factor', pctInput(surv.expenseFactor, v => up('expenseFactor', v)), '%'),
+      makeRow('Survivor expense factor (living costs as % of couple\'s total)', pctInput(surv.expenseFactor, v => up('expenseFactor', v)), '%'),
     );
   }
   const help = document.createElement('p');
@@ -392,14 +490,14 @@ function renderBequestInputs(state, onChange) {
   function up(key, val) { beq[key] = val; onChange(); }
 
   const rows = [
-    makeRow('Set bequest goal',   checkInput(beq.active, v => {
+    makeRow('Bequest goal (flags depletion before target is reached)', checkInput(beq.active, v => {
       beq.active = v;
       renderBequestInputs(state, onChange);
       onChange();
     })),
   ];
   if (beq.active) {
-    rows.push(makeRow('Target bequest', numInput(beq.amount, v => up('amount', v)), '$'));
+    rows.push(makeRow('Target bequest (amount preserved for estate / beneficiaries)', numInput(beq.amount, v => up('amount', v)), '$'));
     const help = document.createElement('p');
     help.className = 'help';
     help.textContent = 'Depletion is flagged when balance falls below this amount, not zero.';

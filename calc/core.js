@@ -221,7 +221,16 @@ export function runProjection(params, applySequencing = false) {
     if (drawdownStarted) {
       drawdownYear++;
       const survivalFactor = survivorMode ? (surv.expenseFactor ?? 0.70) : 1.0;
-      const desiredBase    = s.desiredIncome * survivalFactor;
+      // Phased income: look up which phase applies at this age (today's dollars)
+      const phases = s.incomePhases;
+      let phaseBase = s.desiredIncome ?? 0;
+      if (phases && phases.length > 0) {
+        for (const ph of phases) {
+          phaseBase = ph.income ?? 0;
+          if (ph.untilAge == null || chartAge < ph.untilAge) break;
+        }
+      }
+      const desiredBase    = phaseBase * survivalFactor;
       const desiredNominal = desiredBase * Math.pow(1 + INFLATION, drawdownYear - 1);
 
       // Sequencing shock
@@ -311,8 +320,9 @@ export function runProjection(params, applySequencing = false) {
     cs.forEach(st => { if (st.alive) st.age++; });
   }
 
-  // Summary outputs
-  const requiredLump     = requiredBalance(s.desiredIncome, returnRate, planYears);
+  // Summary outputs — use first phase income for required lump (conservative: assumes phase-1 spending for life)
+  const firstPhaseIncome = s.incomePhases?.[0]?.income ?? s.desiredIncome ?? 0;
+  const requiredLump     = requiredBalance(firstPhaseIncome, returnRate, planYears);
   const retirementBalance = retirementCombined > 0 ? retirementCombined : (cs.reduce((sum, st) => sum + (st.freedomBalance ?? 0), 0) + (s.nonSuper ?? 0));
 
   return {
@@ -325,7 +335,7 @@ export function runProjection(params, applySequencing = false) {
     freedomAge: jointFreedom,
     returnRate,
     planToAge: s.planToAge ?? 95,
-    desiredIncome: s.desiredIncome,
+    desiredIncome: firstPhaseIncome,
     debtNames: debtState.map(db => db.name),
     pensionStartAge,
     lastPensionResult,

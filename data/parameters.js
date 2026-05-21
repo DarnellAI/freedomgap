@@ -101,6 +101,7 @@ export const DEFAULT_STATE = {
     sgcRate: 0.12,
     nonSuper: 0,
     desiredIncome: 100000,
+    incomePhases: [{ income: 100000, untilAge: null }],
     planToAge: 95,
     minDrawdownExcess: 'invest',
   },
