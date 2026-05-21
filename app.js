@@ -589,7 +589,7 @@ function updateChartLegend(results) {
     wrap.appendChild(document.createTextNode(scenario.name));
     container.appendChild(wrap);
   }
-  for (const [color, label] of [['#94a3b8','Min portfolio needed']]) {
+  for (const [color, label] of []) {
     const wrap = document.createElement('span');
     wrap.className = 'flex items-center';
     const dot  = document.createElement('span');

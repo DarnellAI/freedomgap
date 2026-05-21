@@ -1,7 +1,5 @@
 // Chart.js wrapper — multi-scenario overlay with depletion + retirement markers
 
-import { requiredBalance } from '../calc/core.js';
-import { INFLATION } from '../data/parameters.js';
 
 let chartInstance = null;
 
@@ -134,39 +132,6 @@ export function updateChart(scenarioResults) {
       });
     }
 
-    // Required balance reference line (first scenario only) — declining curve from
-    // freedomAge to planToAge. Uses actual projected pension income at each age so
-    // the line shows what the portfolio itself needs to hold (net of pension supplement).
-    // Being below this line is fine when pension is filling the gap.
-    if (datasets.length <= 2 && result.requiredLump > 0) {
-      const { drawdownStartAge, freedomAge, planToAge: pta, desiredIncome, returnRate, rows: projRows } = result;
-      const curveStart = drawdownStartAge ?? freedomAge;
-      if (curveStart) {
-      const endAge = pta ?? 95;
-      const curveData = ages.map(age => {
-        if (age < curveStart) return null;
-        const remaining = Math.max(0, endAge - age);
-        if (remaining === 0) return 0;
-        const row = projRows?.find(r => r.chartAge === age);
-        const pensionIncome  = row?.pensionIncome    ?? 0;
-        const workingIncome  = row?.workingNetIncome ?? 0;
-        const nominalIncome  = desiredIncome * Math.pow(1 + INFLATION, age - curveStart);
-        const netIncome = Math.max(0, nominalIncome - pensionIncome - workingIncome);
-        return requiredBalance(netIncome, returnRate, remaining);
-      });
-      datasets.push({
-        label: 'Min portfolio needed',
-        data: curveData,
-        borderColor: '#94a3b8',
-        backgroundColor: 'transparent',
-        fill: false,
-        borderDash: [8, 4],
-        borderWidth: 1.5,
-        pointRadius: 0,
-        tension: 0,
-      });
-      } // end if curveStart
-    }
   }
 
   chartInstance.data.labels   = labels;
