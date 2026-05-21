@@ -26,12 +26,13 @@ function makeRow(label, control, suffix = '') {
   return div;
 }
 
-function numInput(value, onInput, min = 0, max = 999999999) {
+function numInput(value, onInput, min = 0, max = 999999999, step = 1) {
   const inp = document.createElement('input');
   inp.type = 'number';
   inp.value = value;
   inp.min = min;
   inp.max = max;
+  inp.step = step;
   inp.addEventListener('input', () => onInput(parseFloat(inp.value) || 0));
   return inp;
 }
@@ -46,13 +47,13 @@ function ageInput(value, onInput) {
   return inp;
 }
 
-function pctInput(value, onInput) {
+function pctInput(value, onInput, decimals = 1) {
   const inp = document.createElement('input');
   inp.type = 'number';
-  inp.value = pct(value);
+  inp.value = value == null ? '' : (value * 100).toFixed(decimals);
   inp.min = 0;
   inp.max = 100;
-  inp.step = 0.1;
+  inp.step = Math.pow(0.1, decimals);
   inp.addEventListener('input', () => onInput((parseFloat(inp.value) || 0) / 100));
   return inp;
 }
@@ -349,9 +350,9 @@ function renderOneDebt(d, i, state, onChange) {
 
   const freqOpts = [['weekly','Weekly'],['fortnightly','Fortnightly'],['monthly','Monthly'],['annual','Annual']];
   [
-    makeRow('Balance (current outstanding)',             numInput(d.balance,   v => up('balance', v)),   '$'),
-    makeRow('Interest rate (annual, e.g. 5.50%)',       pctInput(d.rate,      v => up('rate', v)),      '%'),
-    makeRow('Repayment (your regular payment amount)',  numInput(d.repayment, v => up('repayment', v)), '$'),
+    makeRow('Balance (current outstanding)',            numInput(d.balance,   v => up('balance', v)),                       '$'),
+    makeRow('Interest rate (annual, e.g. 6.15%)',      pctInput(d.rate,      v => up('rate', v), 2),                       '%'),
+    makeRow('Repayment (your regular payment amount)', numInput(d.repayment, v => up('repayment', v), 0, 999999999, 0.01), '$'),
     makeRow('Frequency (how often you repay)',          selectInput(freqOpts, d.frequency ?? 'monthly', v => up('frequency', v))),
   ].forEach(r => wrap.appendChild(r));
   return wrap;
@@ -437,8 +438,13 @@ function renderAgedCareInputs(state, onChange) {
 
   function up(key, val) { ac[key] = val; onChange(); }
 
+  const helpIntro = document.createElement('p');
+  helpIntro.className = 'help';
+  helpIntro.textContent = 'Australian residential aged care facilities typically require a Refundable Accommodation Deposit (RAD) — a lump sum lodged upfront, often $500k–$1M+ at premium facilities. When activated, this reserve ring-fences a set amount from the portfolio at a trigger age to model that cost.';
+  container.appendChild(helpIntro);
+
   const rows = [
-    makeRow('Reserve for aged care (set aside funds for future residential care)', checkInput(ac.active, v => {
+    makeRow('Model aged care reserve', checkInput(ac.active, v => {
       ac.active = v;
       renderAgedCareInputs(state, onChange);
       onChange();
@@ -446,10 +452,14 @@ function renderAgedCareInputs(state, onChange) {
   ];
   if (ac.active) {
     rows.push(
-      makeRow('Amount reserved (estimate of RAD / accommodation deposit)',        numInput(ac.amount, v => up('amount', v)), '$'),
-      makeRow('From age (when the reserve is activated)',                         ageInput(ac.triggerAge, v => up('triggerAge', v)), 'yrs'),
-      makeRow('Treatment (invested earns return; RAD bond is lodged at 0%)',      selectInput([['invested','Invested (earns return)'],['rad','RAD bond (0% return)']], ac.mode, v => up('mode', v))),
+      makeRow('RAD / lump sum amount (estimate of upfront deposit required)',     numInput(ac.amount, v => up('amount', v)), '$'),
+      makeRow('Trigger age (age at which the reserve is deducted from portfolio)', ageInput(ac.triggerAge, v => up('triggerAge', v)), 'yrs'),
+      makeRow('How funds are held (Invested = earns return; RAD bond = 0%)',      selectInput([['invested','Invested (earns return)'],['rad','RAD bond (0% return)']], ac.mode, v => up('mode', v))),
     );
+    const helpMode = document.createElement('p');
+    helpMode.className = 'help';
+    helpMode.textContent = 'Choose "Invested" if funds stay in the portfolio until care is needed. Choose "RAD bond" if they\'re lodged with the facility at 0% — the RAD is refundable to the estate on death. The reserve is excluded from the investment pool but included in total wealth.';
+    rows.push(helpMode);
   }
   rows.forEach(r => container.appendChild(r));
 }
@@ -490,17 +500,17 @@ function renderBequestInputs(state, onChange) {
   function up(key, val) { beq[key] = val; onChange(); }
 
   const rows = [
-    makeRow('Bequest goal (flags depletion before target is reached)', checkInput(beq.active, v => {
+    makeRow('Set an estate target (flags depletion before this amount is reached)', checkInput(beq.active, v => {
       beq.active = v;
       renderBequestInputs(state, onChange);
       onChange();
     })),
   ];
   if (beq.active) {
-    rows.push(makeRow('Target bequest (amount preserved for estate / beneficiaries)', numInput(beq.amount, v => up('amount', v)), '$'));
+    rows.push(makeRow('Estate target (minimum balance preserved for beneficiaries)', numInput(beq.amount, v => up('amount', v)), '$'));
     const help = document.createElement('p');
     help.className = 'help';
-    help.textContent = 'Depletion is flagged when balance falls below this amount, not zero.';
+    help.textContent = 'Depletion is flagged when the portfolio falls below this amount rather than zero — useful for clients wanting to leave a set amount to their estate.';
     rows.push(help);
   }
   rows.forEach(r => container.appendChild(r));

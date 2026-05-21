@@ -345,7 +345,7 @@ function exportWorkingsXLSX() {
   sum.push(['── KEY OUTPUTS', '']);
   sum.push(['Retirement balance at freedom:', result.retirementBalance]);
   sum.push(['Required balance (self-funded, no pension):', result.requiredLump]);
-  sum.push(['Funding gap:', result.gap]);
+  sum.push(['Funding gap (excl. estate target):', result.gap]);
   sum.push(['Portfolio depletes at age:', result.depletionAge ?? `${planToAge}+ (fully funded)`]);
   sum.push(['Years fully funded:', result.yearsFullyFunded]);
   sum.push(['Age Pension commences:', result.pensionStartAge ? `Age ${result.pensionStartAge}` : 'Not reached']);
