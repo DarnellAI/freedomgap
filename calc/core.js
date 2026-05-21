@@ -82,15 +82,19 @@ export function runProjection(params, applySequencing = false) {
 
     // ── Debt ───────────────────────────────────────────────────────────────────
     debtRepaymentThisYear = 0;
+    const debtDetails = [];
     for (const db of debtState) {
-      if (db.balance <= 0) continue;
-      const interest = db.balance * db.rate;
-      const totalOwed = db.balance + interest;
-      const actualRepay = Math.min(db.annualRep, totalOwed);
-      db.balance = Math.max(0, totalOwed - db.annualRep);
-      debtRepaymentThisYear += actualRepay;
+      if (db.balance <= 0) { debtDetails.push({ opening: 0, interest: 0, repayment: 0, closing: 0 }); continue; }
+      const opening   = db.balance;
+      const interest  = opening * db.rate;
+      const totalOwed = opening + interest;
+      const repayment = Math.min(db.annualRep, totalOwed);
+      db.balance      = Math.max(0, totalOwed - repayment);
+      debtRepaymentThisYear += repayment;
+      debtDetails.push({ opening, interest, repayment, closing: db.balance });
     }
     row.debtBalances = debtState.map(db => db.balance);
+    row.debtDetails  = debtDetails;
     row.totalDebt    = row.debtBalances.reduce((s, v) => s + v, 0);
 
     // ── Per-client accumulation (only before drawdown starts) ─────────────────
@@ -294,6 +298,8 @@ export function runProjection(params, applySequencing = false) {
       row.dd              = drawdownYear;
       row.startBalance    = combinedBal;
       row.pensionIncome   = pensionIncome;
+      row.desiredNominal  = desiredNominal;
+      row.debtRepaymentYr = debtRepaymentThisYear;
       row.drawdownDraw    = effectiveDraw;
       row.grossReturn     = grossReturn;
       row.endBalance      = Math.max(0, newBal);

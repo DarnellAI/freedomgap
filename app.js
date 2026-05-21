@@ -147,9 +147,11 @@ function setText(id, text) {
 }
 
 // ── Calculation workings table ─────────────────────────────────────────────────
-let workingsData = []; // kept for CSV export
+let workingsData   = [];
+let lastExportData = null; // full result + state stored for XLSX export
 
 function updateWorkingsTable(result, state) {
+  lastExportData = { result, state };
   const tbody = document.getElementById('workingsBody');
   const debtHeader = document.getElementById('debtColHeader');
   if (!tbody) return;
@@ -248,27 +250,214 @@ function updateWorkingsTable(result, state) {
   }
 }
 
-function exportWorkingsCSV() {
-  if (!workingsData.length) return;
-  const hasDebt = workingsData.some(r => r.totalDebt > 0);
-  const headers = ['Age', 'Phase', 'Portfolio Balance ($)', hasDebt ? 'Debt Remaining ($)' : null, 'Formula'].filter(Boolean);
-  const csvRows = [headers.join(',')];
-  for (const r of workingsData) {
-    const cols = [
-      r.age,
-      `"${r.phase}"`,
-      Math.round(r.wealth),
-      hasDebt ? Math.round(r.totalDebt) : null,
-      `"${r.formula.replace(/"/g, '""')}"`,
-    ].filter((_, i) => !(i === 3 && !hasDebt));
-    csvRows.push(cols.join(','));
+// ── XLSX audit export (multi-sheet) ───────────────────────────────────────────
+
+function applyColFormat(ws, cols, fmt, rowCount) {
+  for (let r = 1; r <= rowCount; r++) {
+    for (const c of cols) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (ws[addr] && typeof ws[addr].v === 'number') ws[addr].z = fmt;
+    }
   }
-  // ﻿ = UTF-8 BOM — tells Excel the file is UTF-8 so special chars (−, ·) render correctly
-  const blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+}
+
+function exportWorkingsXLSX() {
+  if (!lastExportData || typeof XLSX === 'undefined') return;
+  const { result, state } = lastExportData;
+  const { returnRate, planToAge, freedomAge, debtNames = [], clientStartAges = [], youngerStart = 0 } = result;
+  const rPct   = (returnRate * 100).toFixed(1);
+  const maxAge = planToAge ?? 95;
+  const c      = state.clients;
+  const hasDebt = debtNames.length > 0;
+  const CUR = '$#,##0';
+
+  function ageLabel(chartAge) {
+    const off = chartAge - youngerStart;
+    return `${clientStartAges[0] + off}/${clientStartAges[1] + off}`;
+  }
+  function clientAge(i, chartAge) { return clientStartAges[i] + (chartAge - youngerStart); }
+
+  const validRows = result.rows.filter(r => r.chartAge != null && r.chartAge <= maxAge);
+  const accumRows = validRows.filter(r => r.dd == null);
+  const drawRows  = validRows.filter(r => r.dd != null);
+
+  const wb = XLSX.utils.book_new();
+
+  // ── Sheet 1: Summary ────────────────────────────────────────────────────────
+  const rp     = RETURN_PROFILES.find(p => p.id === state.shared.returnProfile);
+  const phases = state.shared.incomePhases ?? [{ income: state.shared.desiredIncome ?? 0, untilAge: null }];
+  const sum = [
+    ['FREEDOM GAP CALCULATOR — AUDIT REPORT', ''],
+    ['Generated:', new Date().toLocaleDateString('en-AU')],
+    [],
+    ['── PROJECTION SETTINGS', ''],
+    ['Return profile:', rp ? `${rp.label} (${(rp.rate * 100).toFixed(1)}%)` : state.shared.returnProfile],
+    ['SGC rate:', `${((state.shared.sgcRate ?? 0.12) * 100).toFixed(0)}%`],
+    ['Plan to age:', planToAge],
+    ['Joint freedom age:', freedomAge],
+    [],
+    ["── DESIRED RETIREMENT INCOME (today's $)", ''],
+    ...phases.map((ph, i) => [`Phase ${i + 1}${ph.untilAge ? ` (until age ${ph.untilAge})` : ' (ongoing)'}:`, ph.income]),
+    [],
+    ['── CLIENT 1', c[0].name],
+    ['Gender:', c[0].gender],
+    ['Current age:', c[0].currentAge],
+    ['Life expectancy:', c[0].lifeExpectancy],
+    ['Full-time salary:', c[0].ftIncome],
+    [`Part-time from age / salary:`, `${c[0].ptAge} / $${(c[0].ptIncome ?? 0).toLocaleString()}`],
+    ['Freedom age:', c[0].freedomAge],
+    ['Super balance (now):', c[0].superBalance],
+    ['Additional concessional:', c[0].additionalConcessional ?? 0],
+    ['Downsizer:', c[0].downsizer?.active ? `$${(c[0].downsizer.amount ?? 0).toLocaleString()}` : 'Not used'],
+    [],
+    ['── CLIENT 2', c[1].name],
+    ['Gender:', c[1].gender],
+    ['Current age:', c[1].currentAge],
+    ['Life expectancy:', c[1].lifeExpectancy],
+    ['Full-time salary:', c[1].ftIncome],
+    [`Part-time from age / salary:`, `${c[1].ptAge} / $${(c[1].ptIncome ?? 0).toLocaleString()}`],
+    ['Freedom age:', c[1].freedomAge],
+    ['Super balance (now):', c[1].superBalance],
+    ['Additional concessional:', c[1].additionalConcessional ?? 0],
+    ['Downsizer:', c[1].downsizer?.active ? `$${(c[1].downsizer.amount ?? 0).toLocaleString()}` : 'Not used'],
+    [],
+    ['── AGE PENSION', ''],
+    ['Included:', state.pension?.include ? 'Yes' : 'No'],
+    ['Homeowner:', state.pension?.homeowner ? 'Yes' : 'No'],
+    ['Eligibility age:', state.pension?.pensionAge ?? 67],
+    [],
+  ];
+  if (state.inheritance?.amount > 0) {
+    sum.push(['── INHERITANCE', '']);
+    sum.push(['Amount:', state.inheritance.amount]);
+    sum.push(['Age received (Client 1):', state.inheritance.ageReceived]);
+    sum.push(['Destination:', state.inheritance.destination]);
+    sum.push(['Apply to debt first:', state.inheritance.applyToDebtFirst ? 'Yes' : 'No']);
+    sum.push([]);
+  }
+  if (hasDebt) {
+    sum.push(['── DEBTS', '']);
+    for (const d of state.debts) {
+      sum.push([d.name, d.balance, `${(d.rate * 100).toFixed(2)}% p.a.`, `$${d.repayment}/${d.frequency}`]);
+    }
+    sum.push([]);
+  }
+  sum.push(['── KEY OUTPUTS', '']);
+  sum.push(['Retirement balance at freedom:', result.retirementBalance]);
+  sum.push(['Required balance (self-funded, no pension):', result.requiredLump]);
+  sum.push(['Funding gap:', result.gap]);
+  sum.push(['Portfolio depletes at age:', result.depletionAge ?? `${planToAge}+ (fully funded)`]);
+  sum.push(['Years fully funded:', result.yearsFullyFunded]);
+  sum.push(['Age Pension commences:', result.pensionStartAge ? `Age ${result.pensionStartAge}` : 'Not reached']);
+  if (result.lastPensionResult) {
+    sum.push(['Final year Age Pension (approx):', result.lastPensionResult.annualPension]);
+    sum.push(['Pension binding test:', result.lastPensionResult.binding]);
+  }
+
+  const ws1 = XLSX.utils.aoa_to_sheet(sum);
+  ws1['!cols'] = [{ wch: 42 }, { wch: 28 }, { wch: 20 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
+
+  // ── Sheet 2: Accumulation ────────────────────────────────────────────────────
+  const aHdr = [
+    'Age (C1/C2)', `${c[0].name} Age`, `${c[1].name} Age`,
+    `${c[0].name} Salary`, `${c[0].name} Super Balance`,
+    `${c[1].name} Salary`, `${c[1].name} Super Balance`,
+    'Combined SGC', `Return @ ${rPct}%`, 'Contributions Tax (15%)',
+    'Non-Super Balance', 'Total Portfolio',
+  ];
+  const aBody = accumRows.map(row => {
+    const s0 = (row.accum0 ?? 0) + (row.pension0 ?? 0);
+    const s1 = (row.accum1 ?? 0) + (row.pension1 ?? 0);
+    return [
+      ageLabel(row.chartAge), clientAge(0, row.chartAge), clientAge(1, row.chartAge),
+      row.salary0 ?? 0, s0,
+      row.salary1 ?? 0, s1,
+      row.sgcTotal ?? 0, row.returnAccum ?? 0, row.taxAccum ?? 0,
+      Math.max(0, (row.totalWealth ?? 0) - s0 - s1),
+      row.totalWealth ?? 0,
+    ];
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet([aHdr, ...aBody]);
+  ws2['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }, ...Array(9).fill({ wch: 18 })];
+  applyColFormat(ws2, [3, 4, 5, 6, 7, 8, 9, 10, 11], CUR, aBody.length);
+  XLSX.utils.book_append_sheet(wb, ws2, 'Accumulation');
+
+  // ── Sheet 3: Drawdown ────────────────────────────────────────────────────────
+  const dHdr = [
+    'Age (C1/C2)', `${c[0].name} Age`, `${c[1].name} Age`, 'Retirement Year',
+    'Opening Balance', `Return @ ${rPct}%`, 'Desired Income (nominal)',
+    'Age Pension', 'Debt Repayments', 'Net Portfolio Draw',
+    'Min Drawdown', 'Closing Balance',
+    'Pension — Asset Test', 'Pension — Income Test', 'Pension Binding',
+    'Notes',
+  ];
+  const dBody = drawRows.map(row => {
+    const pr = row.pension;
+    const notes = [
+      row.retirementStart ? 'Retirement begins'               : '',
+      row.survivorEvent   ? 'Survivor mode — partner deceased' : '',
+      row.sequencingShock ? '-25% sequencing shock'            : '',
+      row.agedCareSetup   ? 'Aged care reserve set aside'      : '',
+    ].filter(Boolean).join('; ');
+    return [
+      ageLabel(row.chartAge), clientAge(0, row.chartAge), clientAge(1, row.chartAge), row.dd,
+      row.startBalance    ?? 0,
+      row.grossReturn     ?? 0,
+      row.desiredNominal  ?? 0,
+      row.pensionIncome   ?? 0,
+      row.debtRepaymentYr ?? 0,
+      row.drawdownDraw    ?? 0,
+      row.minDrawdown     ?? 0,
+      row.endBalance      ?? 0,
+      pr?.assetPension  ?? 0,
+      pr?.incomePension ?? 0,
+      pr?.binding       ?? '',
+      notes,
+    ];
+  });
+  const ws3 = XLSX.utils.aoa_to_sheet([dHdr, ...dBody]);
+  ws3['!cols'] = [
+    { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 14 },
+    ...Array(8).fill({ wch: 20 }),
+    { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 35 },
+  ];
+  applyColFormat(ws3, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13], CUR, dBody.length);
+  XLSX.utils.book_append_sheet(wb, ws3, 'Drawdown');
+
+  // ── Sheet 4: Debt Schedule ───────────────────────────────────────────────────
+  if (hasDebt) {
+    const dbHdr = ['Age (C1/C2)', `${c[0].name} Age`, `${c[1].name} Age`];
+    for (const name of debtNames) {
+      dbHdr.push(`${name} — Opening`, `${name} — Interest`, `${name} — Repayment`, `${name} — Closing`);
+    }
+    dbHdr.push('Total Remaining');
+    const dbBody = validRows
+      .filter(r => r.debtDetails && r.debtDetails.some(d => d.opening > 0 || d.repayment > 0))
+      .map(row => {
+        const r = [ageLabel(row.chartAge), clientAge(0, row.chartAge), clientAge(1, row.chartAge)];
+        for (const d of (row.debtDetails ?? [])) r.push(d.opening, d.interest, d.repayment, d.closing);
+        r.push(row.totalDebt ?? 0);
+        return r;
+      });
+    const ws4 = XLSX.utils.aoa_to_sheet([dbHdr, ...dbBody]);
+    const dbCols = [{ wch: 12 }, { wch: 10 }, { wch: 10 }];
+    debtNames.forEach(() => dbCols.push(...Array(4).fill({ wch: 20 })));
+    dbCols.push({ wch: 16 });
+    ws4['!cols'] = dbCols;
+    const numCols4 = Array.from({ length: dbHdr.length - 3 }, (_, i) => i + 3);
+    applyColFormat(ws4, numCols4, CUR, dbBody.length);
+    XLSX.utils.book_append_sheet(wb, ws4, 'Debt Schedule');
+  }
+
+  // Trigger browser download
+  const buf  = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
-  a.download = 'freedom-gap-workings.csv';
+  a.download = 'freedom-gap-audit.xlsx';
   a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function updateChartLegend(results) {
@@ -383,7 +572,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('exportBtn').addEventListener('click', () => exportJSON(scenarios));
-  document.getElementById('exportWorkingsBtn').addEventListener('click', () => exportWorkingsCSV());
+  document.getElementById('exportWorkingsBtn').addEventListener('click', () => exportWorkingsXLSX());
 
   document.getElementById('importBtn').addEventListener('click', () => {
     importJSON(imported => {

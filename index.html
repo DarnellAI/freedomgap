@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="styles.css" />
 <script>
   tailwind.config = {
@@ -282,7 +283,7 @@
     <summary>
       <span>Calculation workings</span>
       <div class="flex items-center gap-3">
-        <button id="exportWorkingsBtn" class="text-xs px-3 py-1 rounded border border-slate-300 text-slate-600 bg-white hover:bg-slate-50" onclick="event.stopPropagation()">Export CSV</button>
+        <button id="exportWorkingsBtn" class="text-xs px-3 py-1 rounded border border-slate-300 text-slate-600 bg-white hover:bg-slate-50" onclick="event.stopPropagation()">Export Excel</button>
         <span class="chevron">▾</span>
       </div>
     </summary>
