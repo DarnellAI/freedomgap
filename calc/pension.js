@@ -24,7 +24,7 @@ export function calcPension({ assets, financialAssets, earnedIncome = 0, homeown
     assetPension = 0;
   } else if (assets > fullThresh) {
     const excessK = Math.floor((assets - fullThresh) / 1000);
-    assetPension = Math.max(0, maxAnnual - excessK * PENSION.taperRate);
+    assetPension = Math.max(0, maxAnnual - excessK * PENSION.taperRate * ix);
   }
 
   // Deeming on financial assets

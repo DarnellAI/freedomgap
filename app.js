@@ -29,6 +29,12 @@ function migrateState(state) {
   if (!state.shared.incomePhases) {
     state.shared.incomePhases = [{ income: state.shared.desiredIncome ?? 100000, untilAge: null }];
   }
+  // Ensure required top-level keys exist (pre-v2 imports may be missing them)
+  if (!state.survivor)  state.survivor  = { active: true,  expenseFactor: 0.70 };
+  if (!state.bequest)   state.bequest   = { active: false, amount: 0 };
+  if (!state.agedCare)  state.agedCare  = { active: false, amount: 500000, triggerAge: 85, mode: 'invested' };
+  if (!state.pension)   state.pension   = { include: true, homeowner: true, pensionAge: 67 };
+  if (!state.inheritance) state.inheritance = { amount: 0, ageReceived: 75, destination: 'nonSuper', applyToDebtFirst: false };
   return state;
 }
 
@@ -147,7 +153,6 @@ function setText(id, text) {
 }
 
 // ── Calculation workings table ─────────────────────────────────────────────────
-let workingsData   = [];
 let lastExportData = null; // full result + state stored for XLSX export
 
 function updateWorkingsTable(result, state) {
@@ -174,7 +179,6 @@ function updateWorkingsTable(result, state) {
   }
 
   const rows = result.rows.filter(row => row.chartAge != null && row.chartAge <= maxAge);
-  workingsData = [];
   tbody.innerHTML = '';
 
   for (const row of rows) {
@@ -226,9 +230,6 @@ function updateWorkingsTable(result, state) {
 
     // ── Phase label ──────────────────────────────────────────────────────────
     const phaseLabel = inDrawdown ? `Drawdown yr ${row.dd}` : 'Accumulation';
-
-    // ── Store for CSV ────────────────────────────────────────────────────────
-    workingsData.push({ age, phase: phaseLabel, wealth, totalDebt, formula });
 
     // ── DOM row ──────────────────────────────────────────────────────────────
     const tr = document.createElement('tr');
@@ -556,7 +557,7 @@ function refreshUI() {
 const EXAMPLE = {
   clients: [
     { name: 'Client 1', gender: 'male',   currentAge: 66, lifeExpectancy: 87, ftIncome: 165000, ptAge: 67, ptIncome: 60000,  freedomAge: 72, superBalance: 290000, additionalConcessional: 0, downsizer: { active: false, amount: 0 } },
-    { name: 'Client 2', gender: 'female', currentAge: 65, lifeExpectancy: 90, ftIncome: 58000,  ptAge: 66, ptIncome: 80000,  freedomAge: 72, superBalance: 185000, additionalConcessional: 0, downsizer: { active: false, amount: 0 } },
+    { name: 'Client 2', gender: 'female', currentAge: 65, lifeExpectancy: 90, ftIncome: 85000,  ptAge: 68, ptIncome: 45000,  freedomAge: 72, superBalance: 185000, additionalConcessional: 0, downsizer: { active: false, amount: 0 } },
   ],
   shared:      { returnProfile: 'growth', sgcRate: 0.12, nonSuper: 0, desiredIncome: 140000, incomePhases: [{ income: 140000, untilAge: 80 }, { income: 90000, untilAge: null }], planToAge: 90, minDrawdownExcess: 'invest' },
   debts:       [],

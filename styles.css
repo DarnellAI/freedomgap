@@ -99,7 +99,6 @@ header p    { color: rgba(255,255,255,.65); font-size: .85rem; }
 .risk-good  { background: linear-gradient(135deg,#15803d,#22c55e); color:#fff; }
 .risk-warn  { background: linear-gradient(135deg,#b45309,#f59e0b); color:#fff; }
 .risk-bad   { background: linear-gradient(135deg,#991b1b,#ef4444); color:#fff; }
-.risk-okay  { background: linear-gradient(135deg,#0369a1,#0ea5e9); color:#fff; }
 
 /* ── Input fields ────────────────────────────────────────── */
 /* Fixed 12rem right column keeps every row's inputs at the same x position
@@ -211,7 +210,6 @@ details > .section-body { padding: 1.25rem; display: flex; flex-direction: colum
 .workings-table td.debt-col { font-variant-numeric: tabular-nums; color: #dc2626; }
 .workings-table tbody tr:nth-child(even) { background: #fafafa; }
 .workings-table tbody tr.phase-change { background: rgba(27,42,78,.06) !important; }
-.workings-table tbody tr.event-row td { font-style: italic; }
 .workings-table .tag {
   display: inline-block;
   font-size: .65rem;
@@ -227,6 +225,4 @@ details > .section-body { padding: 1.25rem; display: flex; flex-direction: colum
 .tag-event   { background: #fef9c3; color: #854d0e; }
 
 /* ── Utilities ───────────────────────────────────────────── */
-.text-gold  { color: var(--gold2); }
-.text-navy  { color: var(--navy); }
 .divider    { border: none; border-top: 1px solid var(--border); margin: .5rem 0; }

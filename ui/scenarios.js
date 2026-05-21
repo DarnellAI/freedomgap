@@ -104,6 +104,7 @@ export function renderScenarioTabs(
       inp.select();
       const finish = () => {
         sc.name = inp.value.trim() || sc.name;
+        saveScenarios(scenarios);
         renderScenarioTabs(scenarios, activeId, onSelect, onAdd, onRemove, onVisibility, onSequencing);
       };
       inp.addEventListener('blur', finish);

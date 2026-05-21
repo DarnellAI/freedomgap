@@ -184,7 +184,7 @@ export function runProjection(params, applySequencing = false) {
     // ── Survivor check ─────────────────────────────────────────────────────────
     for (let i = 0; i < 2; i++) {
       const st = cs[i];
-      if (st.alive && st.age > st.lifeExpectancy && bothAlive) {
+      if (st.alive && st.age >= st.lifeExpectancy && bothAlive) {
         st.alive     = false;
         bothAlive    = false;
         survivorMode = true;
@@ -304,15 +304,14 @@ export function runProjection(params, applySequencing = false) {
       row.grossReturn     = grossReturn;
       row.endBalance      = Math.max(0, newBal);
 
-      // Pension balance grows alongside combined
-      pensionBal = Math.max(0, pensionBal * (1 + returnRate) - minDraw);
+      // Pension balance grows alongside combined; cap prevents drift above total pool
+      pensionBal = Math.min(Math.max(0, pensionBal * (1 + returnRate) - minDraw), combinedBal);
 
       // Depletion detection (balance < bequest target, or zero if no bequest)
       const bequestTarget = beq.active ? (beq.amount ?? 0) : 0;
       const depleted      = newBal < bequestTarget || newBal <= 0;
-      const currentAge    = cs.find(s => s.alive)?.age ?? cs[0].age;
-      if (!depleted) lastPositiveAge = currentAge;
-      if (depleted && depletionAge === null) depletionAge = lastPositiveAge ?? currentAge;
+      if (!depleted) lastPositiveAge = chartAge;
+      if (depleted && depletionAge === null) depletionAge = lastPositiveAge ?? chartAge;
 
       if (drawdownYear <= planYears && newBal >= desiredNominal * (1 + INFLATION)) yearsFullyFunded++;
 

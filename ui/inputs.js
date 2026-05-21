@@ -4,7 +4,6 @@ import { RETURN_PROFILES } from '../data/parameters.js';
 import { calcNetIncome } from '../calc/tax.js';
 
 function dollar(v)  { return v == null ? '' : Math.round(v).toString(); }
-function pct(v)     { return v == null ? '' : (v * 100).toFixed(1); }
 function age(v)     { return v == null ? '' : Math.round(v).toString(); }
 
 function makeRow(label, control, suffix = '') {

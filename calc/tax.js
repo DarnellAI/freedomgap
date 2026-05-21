@@ -1,12 +1,12 @@
 import { SUPER, MIN_DRAWDOWN } from '../data/parameters.js';
 
-// ── Australian income tax 2025-26 ─────────────────────────────────────────────
+// ── Australian income tax 2025-26 (Stage 3 cuts, effective 1 Jul 2024) ────────
 const BRACKETS = [
-  { from: 0,      to: 18200,    base: 0,     rate: 0    },
-  { from: 18200,  to: 45000,    base: 0,     rate: 0.16 },
-  { from: 45000,  to: 135000,   base: 4288,  rate: 0.30 },
-  { from: 135000, to: 190000,   base: 31288, rate: 0.37 },
-  { from: 190000, to: Infinity, base: 51638, rate: 0.45 },
+  { from: 0,      to: 18200,    base: 0,     rate: 0     },
+  { from: 18200,  to: 45000,    base: 0,     rate: 0.19  },
+  { from: 45000,  to: 135000,   base: 5092,  rate: 0.325 },
+  { from: 135000, to: 190000,   base: 34342, rate: 0.37  },
+  { from: 190000, to: Infinity, base: 54692, rate: 0.45  },
 ];
 
 export function calcIncomeTax(gross) {
@@ -21,10 +21,10 @@ export function calcIncomeTax(gross) {
   if (gross <= 37500)      lito = 700;
   else if (gross <= 45000) lito = 700 - (gross - 37500) * 0.05;
   else if (gross <= 66667) lito = Math.max(0, 325 - (gross - 45000) * 0.015);
-  // Medicare Levy (2%, phases in above $24,276 at 10c/dollar until 2% applies)
+  // Medicare Levy (2%, phases in above $26,000 at 10c/dollar until full 2% at $32,500)
   let medicare = 0;
-  if (gross > 24276 && gross <= 30345) medicare = (gross - 24276) * 0.10;
-  else if (gross > 30345)              medicare = gross * 0.02;
+  if (gross > 26000 && gross <= 32500) medicare = (gross - 26000) * 0.10;
+  else if (gross > 32500)              medicare = gross * 0.02;
   return Math.max(0, tax - lito + medicare);
 }
 
