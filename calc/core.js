@@ -260,6 +260,7 @@ export function runProjection(params, applySequencing = false) {
             earnedIncome:    0,
             homeowner:       pen.homeowner ?? true,
             bothAlive,
+            pensionYear:     drawdownYear - 1,
           });
           pensionIncome = penRes.annualPension;
           lastPensionResult = penRes;

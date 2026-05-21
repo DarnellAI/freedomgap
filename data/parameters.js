@@ -54,6 +54,10 @@ export const RETURN_PROFILES = [
 
 export const INFLATION = 0.025;
 
+// Age Pension indexation rate — deliberately conservative (below general inflation)
+// so the pension loses slight real ground over time, giving a more cautious projection.
+export const PENSION_INDEXATION = 0.02;
+
 export const DEFAULT_SGC = 0.12;
 
 // ABS life tables approximation (age at death, 50th percentile)
