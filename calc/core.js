@@ -52,6 +52,7 @@ export function runProjection(params, applySequencing = false) {
     pension:        0,
     tbcUsed:        0,
     atFreedom:      false,
+    working:        true,   // still earning salary; stops at freedomAge
     freedomBalance: null,
     alive:          true,
     lifeExpectancy: x.lifeExpectancy ?? 87,
@@ -138,6 +139,7 @@ export function runProjection(params, applySequencing = false) {
           st.tbcUsed   = conv.newTbcUsed;
           st.freedomBalance = st.pension + st.accum;
           st.atFreedom = true;
+          st.working   = false;
         }
       } else if (!drawdownStarted && st.atFreedom) {
         // Post-freedom pre-drawdown: grow both components
@@ -158,18 +160,23 @@ export function runProjection(params, applySequencing = false) {
     const inhTriggerYear = inh.ageReceived - c[0].currentAge + 1;
     if (inh.amount > 0 && t === inhTriggerYear) {
       let inhRemaining = inh.amount;
+      let inhDebtPayoff = 0;
       // Pay down debt first (highest rate first) if toggled
       if (inh.applyToDebtFirst) {
         const sorted = [...debtState].sort((a, b) => b.rate - a.rate);
         for (const db of sorted) {
           if (db.balance <= 0 || inhRemaining <= 0) continue;
           const payoff = Math.min(inhRemaining, db.balance);
-          db.balance  -= payoff;
+          db.balance   -= payoff;
           inhRemaining -= payoff;
+          inhDebtPayoff += payoff;
         }
         row.debtBalances = debtState.map(db => db.balance);
         row.totalDebt    = row.debtBalances.reduce((s, v) => s + v, 0);
       }
+      row.inheritanceAmount    = inh.amount;
+      row.inheritanceDebtPayoff = inhDebtPayoff;
+      row.inheritanceToPool    = inhRemaining;
       if (inhRemaining > 0) {
         if (drawdownStarted) {
           combinedBal += inhRemaining;
@@ -253,44 +260,74 @@ export function runProjection(params, applySequencing = false) {
     // ── Drawdown ───────────────────────────────────────────────────────────────
     if (drawdownStarted) {
       drawdownYear++;
+      row.startBalance = combinedBal; // opening balance before any intra-year changes
 
-      // Still-working clients accumulate separately; their net income offsets the draw
+      // Super merges at pension access age (67) OR freedom age, whichever is first —
+      // so depletion detection always uses total accessible household wealth.
+      // Working income offset continues until freedom age, regardless of when super merged.
       let workingNetIncome  = 0;
       let workingGrossIncome = 0;
+      const pensionAccessAge = pen.pensionAge ?? 67;
       for (let i = 0; i < 2; i++) {
-        const st = cs[i];
-        if (!st.alive || st.atFreedom) continue;
+        const st  = cs[i];
         const cli = c[i];
+        if (!st.alive) continue;
+        if (st.atFreedom && !st.working) continue; // fully retired, skip
+
         const base   = st.age >= cli.ptAge ? cli.ptIncome : cli.ftIncome;
         const salary = base * Math.pow(1 + INFLATION, t - 1);
-        workingNetIncome   += calcNetIncome(salary);
-        workingGrossIncome += salary;
-        // Skip accumStep in the year drawdown first starts — pre-drawdown loop already ran it
-        if (!row.retirementStart) {
-          row[`salary${i}`] = salary;
-          const addCC = Math.min(cli.additionalConcessional ?? 0, SUPER.concessionalCap);
-          const acc   = accumStep(st.accum, salary, s.sgcRate ?? 0.12, addCC, returnRate);
-          st.accum    = acc.closing;
-          row[`sgc${i}`]    = acc.contribGross;
-          row[`return${i}`] = acc.grossReturn;
-          row[`tax${i}`]    = acc.tax;
-        }
-        // Client reaches their freedom age mid-drawdown → merge into pool
-        if (st.age >= cli.freedomAge) {
-          if (cli.downsizer?.active && st.age >= 55) {
-            st.accum += Math.min(cli.downsizer.amount ?? 0, SUPER.downsizer.maxPerPerson);
+
+        if (!st.atFreedom) {
+          // Super not yet in pool — accumulate separately (skip in retirementStart year)
+          if (!row.retirementStart) {
+            row[`salary${i}`] = salary;
+            const addCC = Math.min(cli.additionalConcessional ?? 0, SUPER.concessionalCap);
+            const acc   = accumStep(st.accum, salary, s.sgcRate ?? 0.12, addCC, returnRate);
+            st.accum    = acc.closing;
+            row[`sgc${i}`]    = acc.contribGross;
+            row[`return${i}`] = acc.grossReturn;
+            row[`tax${i}`]    = acc.tax;
           }
-          const conv  = convertToPension(st.accum, st.tbcUsed);
-          st.pension  = conv.pensionAdded;
-          st.accum    = conv.accumRemaining;
-          st.tbcUsed  = conv.newTbcUsed;
-          st.atFreedom = true;
-          combinedBal += st.pension + st.accum;
-          pensionBal  += st.pension;
-          st.pension = 0;
-          st.accum   = 0;
-          row.partnerJoinsRetirement = true;
+          // Merge into pool at pension access age (67) or freedom age, whichever first
+          if (st.age >= Math.min(cli.freedomAge, pensionAccessAge)) {
+            if (cli.downsizer?.active && st.age >= 55) {
+              st.accum += Math.min(cli.downsizer.amount ?? 0, SUPER.downsizer.maxPerPerson);
+            }
+            const conv  = convertToPension(st.accum, st.tbcUsed);
+            st.pension  = conv.pensionAdded;
+            st.accum    = conv.accumRemaining;
+            st.tbcUsed  = conv.newTbcUsed;
+            st.atFreedom = true;
+            combinedBal += st.pension + st.accum;
+            pensionBal  += st.pension;
+            st.pension = 0;
+            st.accum   = 0;
+            row.partnerJoinsRetirement = true;
+          }
+        } else {
+          // Super already in pool (merged at 67 before freedom age) — still earning.
+          // SGC goes directly into pool as net contribution; return flows with pool.
+          if (!row.retirementStart) {
+            row[`salary${i}`] = salary;
+            const addCC        = Math.min(cli.additionalConcessional ?? 0, SUPER.concessionalCap);
+            const contribGross = Math.min(salary * (s.sgcRate ?? 0.12) + addCC, SUPER.concessionalCap);
+            const contribTax   = contribGross * SUPER.accumTaxRate;
+            combinedBal       += contribGross - contribTax;
+            row[`sgc${i}`]     = contribGross;
+            row[`tax${i}`]     = contribTax;
+          }
         }
+
+        // Income offset continues until freedom age
+        if (st.working) {
+          workingNetIncome   += calcNetIncome(salary);
+          workingGrossIncome += salary;
+          if (st.age >= cli.freedomAge) {
+            st.working = false;
+            if (!row.partnerJoinsRetirement) row.partnerJoinsRetirement = true;
+          }
+        }
+
         row[`accum${i}`]   = st.accum;
         row[`pension${i}`] = st.pension;
       }
@@ -334,20 +371,21 @@ export function runProjection(params, applySequencing = false) {
         }
       }
 
-      // Age Pension
-      // Working partner's super is assessable once both partners are over pension age
+      // Age Pension — working partner's super not yet in pool (below 67) is still assessable
       const stillWorkingSuper = cs.reduce(
         (sum, st) => (!st.alive || st.atFreedom) ? sum : sum + st.accum + st.pension, 0
       );
+      const pensionTotalAssets = combinedBal + stillWorkingSuper;
+      row.pensionTotalAssets = pensionTotalAssets;
+      row.pensionBothAlive   = bothAlive;
       let pensionIncome = 0;
       if (pen.include) {
         const aliveAges   = cs.filter(s => s.alive).map(s => s.age);
         const youngestAge = Math.min(...aliveAges);
         if (youngestAge >= (pen.pensionAge ?? 67)) {
-          const totalAssets = combinedBal + stillWorkingSuper;
           const penRes = calcPension({
-            assets:          totalAssets,
-            financialAssets: totalAssets,
+            assets:          pensionTotalAssets,
+            financialAssets: pensionTotalAssets,
             earnedIncome:    workingGrossIncome,
             homeowner:       pen.homeowner ?? true,
             bothAlive,
@@ -378,7 +416,6 @@ export function runProjection(params, applySequencing = false) {
       const newBal      = combinedBal + grossReturn - effectiveDraw + surplusSaving;
 
       row.dd              = drawdownYear;
-      row.startBalance    = combinedBal;
       row.pensionIncome   = pensionIncome;
       row.desiredNominal  = desiredNominal;
       row.debtRepaymentYr = debtRepaymentThisYear;

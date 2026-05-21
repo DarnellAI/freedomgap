@@ -292,6 +292,7 @@ function exportWorkingsXLSX() {
   const rPct   = (returnRate * 100).toFixed(1);
   const maxAge = planToAge ?? 95;
   const c      = state.clients;
+  const n0     = c[0].name, n1 = c[1].name;
   const hasDebt = debtNames.length > 0;
   const CUR = '$#,##0';
 
@@ -302,12 +303,11 @@ function exportWorkingsXLSX() {
   function clientAge(i, chartAge) { return clientStartAges[i] + (chartAge - youngerStart); }
 
   const validRows = result.rows.filter(r => r.chartAge != null && r.chartAge <= maxAge);
-  const accumRows = validRows.filter(r => r.dd == null);
   const drawRows  = validRows.filter(r => r.dd != null);
 
   const wb = XLSX.utils.book_new();
 
-  // ── Sheet 1: Summary ────────────────────────────────────────────────────────
+  // ── Sheet 1: Overview (unchanged) ──────────────────────────────────────────
   const rp     = RETURN_PROFILES.find(p => p.id === state.shared.returnProfile);
   const phases = state.shared.incomePhases ?? [{ income: state.shared.desiredIncome ?? 0, untilAge: null }];
   const sum = [
@@ -377,125 +377,205 @@ function exportWorkingsXLSX() {
     sum.push(['Final year Age Pension (approx):', result.lastPensionResult.annualPension]);
     sum.push(['Pension binding test:', result.lastPensionResult.binding]);
   }
-
   const ws1 = XLSX.utils.aoa_to_sheet(sum);
   ws1['!cols'] = [{ wch: 42 }, { wch: 28 }, { wch: 20 }, { wch: 20 }];
-  XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
+  XLSX.utils.book_append_sheet(wb, ws1, 'Overview');
 
-  // ── Sheet 2: Accumulation ────────────────────────────────────────────────────
-  const n0 = c[0].name, n1 = c[1].name;
-  const aHdr = [
-    'Age (C1/C2)', `${n0} Age`, `${n1} Age`,
-    `${n0} Salary`, `${n0} Opening Super`, `${n0} SGC`, `${n0} Return @ ${rPct}%`, `${n0} Tax (15%)`, `${n0} Closing Super`,
-    `${n1} Salary`, `${n1} Opening Super`, `${n1} SGC`, `${n1} Return @ ${rPct}%`, `${n1} Tax (15%)`, `${n1} Closing Super`,
-    'Non-Super Balance', 'Total Portfolio',
-    'Check: ΣOpening + ΣSGC + ΣReturn − ΣTax',
+  // ── Sheet 2: Portfolio Balance (all years, combined household) ─────────────
+  // Combined balance schedule driven by SGC contributions and investment returns.
+  // Surplus cashflow from Sheet 3 is treated as an NCC contribution.
+  // Portfolio drawdown from Sheet 3 reduces the balance.
+  const pb2Hdr = [
+    'Age (C1/C2)', 'Phase',
+    'Combined Starting Balance',
+    `SGC — ${n0}`, `SGC — ${n1}`,
+    'Surplus Contribution',
+    `Investment Return — ${n0}`, `Investment Return — ${n1}`,
+    `Tax — ${n0}`, `Tax — ${n1}`,
+    'Portfolio Drawdown',
+    'Combined Ending Balance',
   ];
-  const aBody = accumRows.map((row, idx) => {
-    const s0 = (row.accum0 ?? 0) + (row.pension0 ?? 0);
-    const s1 = (row.accum1 ?? 0) + (row.pension1 ?? 0);
-    const prevRow = accumRows[idx - 1];
-    const openS0  = prevRow ? ((prevRow.accum0 ?? 0) + (prevRow.pension0 ?? 0)) : (c[0].superBalance ?? 0);
-    const openS1  = prevRow ? ((prevRow.accum1 ?? 0) + (prevRow.pension1 ?? 0)) : (c[1].superBalance ?? 0);
-    const openNS  = prevRow
-      ? Math.max(0, (prevRow.totalWealth ?? 0) - ((prevRow.accum0 ?? 0) + (prevRow.pension0 ?? 0) + (prevRow.accum1 ?? 0) + (prevRow.pension1 ?? 0)))
-      : (state.shared.nonSuper ?? 0);
-    const sgc0 = row.sgc0    ?? 0;
-    const ret0 = row.return0 ?? 0;
-    const tax0 = row.tax0    ?? 0;
-    const sgc1 = row.sgc1    ?? 0;
+  const pb2Body = validRows.map((row, idx) => {
+    const inDD   = row.dd != null;
+    const prevRow = validRows[idx - 1];
+    const startBal = idx === 0
+      ? (c[0].superBalance ?? 0) + (c[1].superBalance ?? 0) + (state.shared.nonSuper ?? 0)
+      : (prevRow.totalWealth ?? 0);
+    const sgc0 = row.sgc0 ?? 0;
+    const sgc1 = row.sgc1 ?? 0;
+    const surplus = inDD ? (row.surplusSaving ?? 0) : 0;
+    // During drawdown the combined pool return goes in the C1 column; any separate
+    // below-67 working super return is in the respective client column.
+    const ret0 = inDD
+      ? (row.grossReturn ?? 0) + (row.return0 ?? 0)
+      : (row.return0 ?? 0);
     const ret1 = row.return1 ?? 0;
-    const tax1 = row.tax1    ?? 0;
-    const nonSuperBal = Math.max(0, (row.totalWealth ?? 0) - s0 - s1);
+    const tax0 = row.tax0 ?? 0;
+    const tax1 = row.tax1 ?? 0;
+    // Accumulation drawdown = debt repayment from non-super; retirement drawdown = net portfolio draw
+    const draw = inDD
+      ? (row.drawdownDraw ?? 0)
+      : (row.debtDetails?.reduce((s, d) => s + d.repayment, 0) ?? 0);
+    const endBal = row.totalWealth ?? 0;
     return [
-      ageLabel(row.chartAge), clientAge(0, row.chartAge), clientAge(1, row.chartAge),
-      row.salary0 ?? 0, openS0, sgc0, ret0, tax0, s0,
-      row.salary1 ?? 0, openS1, sgc1, ret1, tax1, s1,
-      nonSuperBal,
-      row.totalWealth ?? 0,
-      (openS0 + openS1 + openNS) + (sgc0 + sgc1) + (ret0 + ret1) - (tax0 + tax1),
+      ageLabel(row.chartAge),
+      inDD ? `Drawdown yr ${row.dd}` : 'Accumulation',
+      startBal, sgc0, sgc1, surplus, ret0, ret1, tax0, tax1, draw, endBal,
     ];
   });
-  const ws2 = XLSX.utils.aoa_to_sheet([aHdr, ...aBody]);
-  ws2['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }, ...Array(15).fill({ wch: 20 })];
-  // Currency format for all dollar columns (indices 3–17)
-  applyColFormat(ws2, Array.from({ length: 15 }, (_, i) => i + 3), CUR, aBody.length);
-  XLSX.utils.book_append_sheet(wb, ws2, 'Accumulation');
+  const ws2 = XLSX.utils.aoa_to_sheet([pb2Hdr, ...pb2Body]);
+  ws2['!cols'] = [{ wch: 12 }, { wch: 16 }, ...Array(10).fill({ wch: 22 })];
+  applyColFormat(ws2, Array.from({ length: 10 }, (_, i) => i + 2), CUR, pb2Body.length);
+  XLSX.utils.book_append_sheet(wb, ws2, 'Portfolio Balance');
 
-  // ── Sheet 3: Drawdown ────────────────────────────────────────────────────────
-  const dHdr = [
-    'Age (C1/C2)', `${c[0].name} Age`, `${c[1].name} Age`, 'Retirement Year',
-    'Opening Pool', `Return @ ${rPct}%`, 'Desired Income (nominal)',
-    'Age Pension', 'Working Partner Net Income', 'Working Partner Gross Income (pension test)', 'Working Partner Super (outside pool)',
-    'Debt Repayments', 'Income Surplus Saved to Pool', 'Net Portfolio Draw',
-    'Min Drawdown', 'Closing Pool', 'Total Wealth (Pool + Partner Super)',
-    'Pension — Asset Test', 'Pension — Income Test', 'Pension Binding',
+  // ── Sheet 3: Drawdowns (cashflow surplus / deficit) ─────────────────────────
+  // Formula: Drawdown Req = Desired Income + Debt Repayments − Aged Pension − Combined Net Income
+  // Positive = deficit → portfolio drawdown; Negative = surplus → NCC contribution to Sheet 2.
+  const dd3Hdr = [
+    'Age (C1/C2)', 'Retirement Year',
+    'Desired Income (nominal)',
+    'Debt Repayments',
+    'Aged Pension Received',
+    'Combined Net Working Income',
+    'Drawdown Requirement',
+    'Direction',
     'Notes',
   ];
-  const dBody = drawRows.map(row => {
-    const pr = row.pension;
+  const dd3Body = drawRows.map(row => {
+    const desired  = row.desiredNominal  ?? 0;
+    const debt     = row.debtRepaymentYr ?? 0;
+    const pension  = row.pensionIncome   ?? 0;
+    const netInc   = row.workingNetIncome ?? 0;
+    const req      = desired + debt - pension - netInc; // positive = draw, negative = surplus
     const notes = [
       row.retirementStart        ? 'Retirement begins'               : '',
-      row.partnerJoinsRetirement ? 'Working partner now retired'      : '',
-      row.survivorEvent          ? 'Survivor mode — partner deceased' : '',
-      row.sequencingShock        ? '-25% sequencing shock'            : '',
-      row.agedCareSetup          ? 'Aged care reserve set aside'      : '',
+      row.partnerJoinsRetirement ? 'Working partner joins pool'       : '',
+      row.survivorEvent          ? 'Survivor — partner deceased'      : '',
+      row.sequencingShock        ? '−25% sequencing shock applied'    : '',
+      row.agedCareSetup          ? `Aged care reserve: $${Math.round(row.agedCareSetup).toLocaleString()}` : '',
+      row.inheritanceToPool > 0  ? `Inheritance to pool: $${Math.round(row.inheritanceToPool).toLocaleString()}` : '',
     ].filter(Boolean).join('; ');
-    const partnerSuper = row.stillWorkingSuper ?? 0;
     return [
-      ageLabel(row.chartAge), clientAge(0, row.chartAge), clientAge(1, row.chartAge), row.dd,
-      row.startBalance       ?? 0,
-      row.grossReturn        ?? 0,
-      row.desiredNominal     ?? 0,
-      row.pensionIncome        ?? 0,
-      row.workingNetIncome     ?? 0,
-      row.workingGrossIncome   ?? 0,
-      partnerSuper,
-      row.debtRepaymentYr    ?? 0,
-      row.surplusSaving      ?? 0,
-      row.drawdownDraw       ?? 0,
-      row.minDrawdown        ?? 0,
-      row.endBalance         ?? 0,
-      (row.endBalance ?? 0) + partnerSuper,
-      pr?.assetPension  ?? 0,
-      pr?.incomePension ?? 0,
-      pr?.binding       ?? '',
+      ageLabel(row.chartAge), row.dd,
+      desired, debt, pension, netInc,
+      Math.abs(req),
+      req > 0 ? 'Drawdown' : req < 0 ? 'Surplus' : 'Neutral',
       notes,
     ];
   });
-  const ws3 = XLSX.utils.aoa_to_sheet([dHdr, ...dBody]);
+  const ws3 = XLSX.utils.aoa_to_sheet([dd3Hdr, ...dd3Body]);
   ws3['!cols'] = [
-    { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 14 },
-    ...Array(11).fill({ wch: 22 }),
-    { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 35 },
+    { wch: 12 }, { wch: 14 },
+    { wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 26 },
+    { wch: 22 }, { wch: 12 }, { wch: 40 },
   ];
-  applyColFormat(ws3, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], CUR, dBody.length);
-  XLSX.utils.book_append_sheet(wb, ws3, 'Drawdown');
+  applyColFormat(ws3, [2, 3, 4, 5, 6], CUR, dd3Body.length);
+  XLSX.utils.book_append_sheet(wb, ws3, 'Drawdowns');
 
-  // ── Sheet 4: Debt Schedule ───────────────────────────────────────────────────
+  // ── Sheet 4: Debt Schedule (with inheritance attribution) ──────────────────
   if (hasDebt) {
-    const dbHdr = ['Age (C1/C2)', `${c[0].name} Age`, `${c[1].name} Age`];
+    const dbHdr = ['Age (C1/C2)', 'Phase'];
     for (const name of debtNames) {
-      dbHdr.push(`${name} — Opening`, `${name} — Interest`, `${name} — Repayment`, `${name} — Closing`);
+      dbHdr.push(
+        `${name} — Opening`,
+        `${name} — Interest`,
+        `${name} — Regular Repayment`,
+        `${name} — Inheritance Applied`,
+        `${name} — Closing Balance`,
+      );
     }
-    dbHdr.push('Total Remaining');
-    const dbBody = validRows
-      .filter(r => r.debtDetails && r.debtDetails.some(d => d.opening > 0 || d.repayment > 0))
-      .map(row => {
-        const r = [ageLabel(row.chartAge), clientAge(0, row.chartAge), clientAge(1, row.chartAge)];
-        for (const d of (row.debtDetails ?? [])) r.push(d.opening, d.interest, d.repayment, d.closing);
-        r.push(row.totalDebt ?? 0);
-        return r;
-      });
+    dbHdr.push('Total Remaining', 'Notes');
+    const debtRows = validRows.filter(r =>
+      r.debtDetails && r.debtDetails.some(d => d.opening > 0 || d.repayment > 0 || d.closing > 0)
+    );
+    const dbBody = debtRows.map(row => {
+      const inDD = row.dd != null;
+      const rowData = [
+        ageLabel(row.chartAge),
+        inDD ? `Drawdown yr ${row.dd}` : 'Accumulation',
+      ];
+      for (let i = 0; i < debtNames.length; i++) {
+        const d = (row.debtDetails ?? [])[i] ?? { opening: 0, interest: 0, repayment: 0, closing: 0 };
+        // Inheritance payoff = difference between normal closing and final closing (post-inheritance)
+        const finalClosing  = (row.debtBalances ?? [])[i] ?? d.closing;
+        const inhApplied    = Math.max(0, d.closing - finalClosing);
+        rowData.push(d.opening, d.interest, d.repayment, inhApplied, finalClosing);
+      }
+      const notes = [
+        row.inheritanceDebtPayoff > 0
+          ? `Inheritance payoff: $${Math.round(row.inheritanceDebtPayoff).toLocaleString()}`
+          : '',
+        row.inheritanceToPool > 0
+          ? `Remaining inheritance to portfolio: $${Math.round(row.inheritanceToPool).toLocaleString()}`
+          : '',
+      ].filter(Boolean).join('; ');
+      rowData.push(row.totalDebt ?? 0, notes);
+      return rowData;
+    });
     const ws4 = XLSX.utils.aoa_to_sheet([dbHdr, ...dbBody]);
-    const dbCols = [{ wch: 12 }, { wch: 10 }, { wch: 10 }];
-    debtNames.forEach(() => dbCols.push(...Array(4).fill({ wch: 20 })));
-    dbCols.push({ wch: 16 });
+    const dbCols = [{ wch: 12 }, { wch: 16 }];
+    debtNames.forEach(() => dbCols.push(...Array(5).fill({ wch: 22 })));
+    dbCols.push({ wch: 16 }, { wch: 45 });
     ws4['!cols'] = dbCols;
-    const numCols4 = Array.from({ length: dbHdr.length - 3 }, (_, i) => i + 3);
+    const numCols4 = Array.from({ length: dbHdr.length - 3 }, (_, i) => i + 2);
     applyColFormat(ws4, numCols4, CUR, dbBody.length);
     XLSX.utils.book_append_sheet(wb, ws4, 'Debt Schedule');
   }
+
+  // ── Sheet 5: Aged Pension (eligibility and test detail) ────────────────────
+  // Single source of truth for pension calculations. Sheet 3 takes only the annual
+  // entitlement figure from here.
+  const ap5Hdr = [
+    'Age (C1/C2)', 'Retirement Year',
+    'Household',
+    'Total Assessable Assets',
+    'Max Annual Pension',
+    'Assets Test Result',
+    'Income Test Result',
+    'Deemed Income',
+    'Earned Income (post Work Bonus)',
+    'Binding Test',
+    'Annual Pension Entitlement',
+    'Status',
+  ];
+  const pensionAge = state.pension?.pensionAge ?? 67;
+  const ap5Body = drawRows.map(row => {
+    const pr = row.pension;
+    const household = row.pensionBothAlive ? 'Couple' : 'Single';
+    let status;
+    if (!state.pension?.include) {
+      status = 'Excluded from model';
+    } else if (!pr) {
+      status = `Not yet eligible (below age ${pensionAge})`;
+    } else if (pr.annualPension <= 0) {
+      status = 'Over threshold — nil pension';
+    } else if (pr.fullPension) {
+      status = 'Full pension';
+    } else {
+      status = 'Part pension';
+    }
+    return [
+      ageLabel(row.chartAge), row.dd,
+      household,
+      row.pensionTotalAssets ?? 0,
+      pr?.maxAnnual       ?? 0,
+      pr?.assetPension    ?? 0,
+      pr?.incomePension   ?? 0,
+      pr?.deemedIncome    ?? 0,
+      pr?.assessableEarned ?? 0,
+      pr?.binding         ?? '—',
+      pr?.annualPension   ?? 0,
+      status,
+    ];
+  });
+  const ws5 = XLSX.utils.aoa_to_sheet([ap5Hdr, ...ap5Body]);
+  ws5['!cols'] = [
+    { wch: 12 }, { wch: 14 }, { wch: 10 },
+    { wch: 24 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
+    { wch: 18 }, { wch: 26 }, { wch: 14 }, { wch: 24 }, { wch: 28 },
+  ];
+  applyColFormat(ws5, [3, 4, 5, 6, 7, 8, 10], CUR, ap5Body.length);
+  XLSX.utils.book_append_sheet(wb, ws5, 'Aged Pension');
 
   // Trigger browser download
   const buf  = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });

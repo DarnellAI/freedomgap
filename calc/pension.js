@@ -48,6 +48,7 @@ export function calcPension({ assets, financialAssets, earnedIncome = 0, homeown
     annualPension,
     assetPension,
     incomePension,
+    maxAnnual,
     deemedIncome,
     assessableEarned,
     totalIncome,
