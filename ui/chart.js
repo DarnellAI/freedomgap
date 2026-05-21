@@ -1,5 +1,8 @@
 // Chart.js wrapper — multi-scenario overlay with depletion + retirement markers
 
+import { requiredBalance } from '../calc/core.js';
+import { INFLATION } from '../data/parameters.js';
+
 let chartInstance = null;
 
 // Draws the depletion marker as a canvas overlay rather than a data spike,
@@ -92,11 +95,12 @@ function fmtM(v) {
 export function updateChart(scenarioResults) {
   if (!chartInstance) return;
 
-  // Collect all chart ages to build a unified x-axis
+  // Collect all chart ages, capped at the highest planToAge across scenarios
+  const maxPlanToAge = Math.max(...scenarioResults.map(sr => sr.result.planToAge ?? 95));
   const allAges = new Set();
   for (const { result } of scenarioResults) {
     for (const row of result.rows) {
-      if (row.chartAge != null) allAges.add(row.chartAge);
+      if (row.chartAge != null && row.chartAge <= maxPlanToAge) allAges.add(row.chartAge);
     }
   }
   const ages   = [...allAges].sort((a, b) => a - b);
@@ -144,23 +148,30 @@ export function updateChart(scenarioResults) {
       });
     }
 
-    // Required balance reference line (first scenario only)
+    // Required balance reference line (first scenario only) — declining curve from
+    // freedomAge to planToAge, showing how much is needed at each age to fund the
+    // remaining income stream. Reaches zero at planToAge.
     if (datasets.length <= 2 && result.requiredLump > 0 && result.freedomAge) {
-      const retirementRow = result.rows.find(r => r.retirementStart);
-      if (retirementRow) {
-        const flatTarget = ages.map(age => age < result.freedomAge ? null : result.requiredLump);
-        datasets.push({
-          label: 'Required balance',
-          data: flatTarget,
-          borderColor: '#94a3b8',
-          backgroundColor: 'transparent',
-          fill: false,
-          borderDash: [8, 4],
-          borderWidth: 1.5,
-          pointRadius: 0,
-          tension: 0,
-        });
-      }
+      const { freedomAge, planToAge: pta, desiredIncome, returnRate } = result;
+      const endAge = pta ?? 95;
+      const curveData = ages.map(age => {
+        if (age < freedomAge) return null;
+        const remaining = Math.max(0, endAge - age);
+        if (remaining === 0) return 0;
+        const nominalIncome = desiredIncome * Math.pow(1 + INFLATION, age - freedomAge);
+        return requiredBalance(nominalIncome, returnRate, remaining);
+      });
+      datasets.push({
+        label: 'Required balance',
+        data: curveData,
+        borderColor: '#94a3b8',
+        backgroundColor: 'transparent',
+        fill: false,
+        borderDash: [8, 4],
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0,
+      });
     }
   }
 

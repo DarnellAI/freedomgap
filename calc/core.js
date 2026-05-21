@@ -35,7 +35,7 @@ export function runProjection(params, applySequencing = false) {
   const returnRate   = getReturnRate(s.returnProfile);
   const jointFreedom = Math.max(c[0].freedomAge, c[1].freedomAge);
   const olderStart   = Math.min(c[0].currentAge, c[1].currentAge);
-  const totalYears   = Math.max(55, (s.planToAge ?? 95) - olderStart + 5);
+  const totalYears   = (s.planToAge ?? 95) - olderStart + 2;
   const planYears    = Math.max(1, (s.planToAge ?? 95) - jointFreedom);
 
   // Per-client mutable state
@@ -287,6 +287,8 @@ export function runProjection(params, applySequencing = false) {
     yearsFullyFunded,
     freedomAge: jointFreedom,
     returnRate,
+    planToAge: s.planToAge ?? 95,
+    desiredIncome: s.desiredIncome,
     pensionStartAge,
     lastPensionResult,
     safeEarn: safeEarnAmount(true),
