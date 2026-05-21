@@ -341,5 +341,7 @@ export function runProjection(params, applySequencing = false) {
     lastPensionResult,
     safeEarn: safeEarnAmount(true),
     safeEarnSingle: safeEarnAmount(false),
+    clientStartAges: [c[0].currentAge, c[1].currentAge],
+    youngerStart: olderStart,
   };
 }

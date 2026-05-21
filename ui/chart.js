@@ -103,8 +103,19 @@ export function updateChart(scenarioResults) {
       if (row.chartAge != null && row.chartAge <= maxPlanToAge) allAges.add(row.chartAge);
     }
   }
-  const ages   = [...allAges].sort((a, b) => a - b);
-  const labels = ages.map(String);
+  const ages = [...allAges].sort((a, b) => a - b);
+
+  // Dual-age x-axis labels: show both clients' ages at each tick (e.g. "72/71")
+  const firstRes = scenarioResults[0]?.result;
+  const c0Start     = firstRes?.clientStartAges?.[0];
+  const c1Start     = firstRes?.clientStartAges?.[1];
+  const youngerStart = firstRes?.youngerStart;
+  const labels = (c0Start != null && c1Start != null && youngerStart != null)
+    ? ages.map(age => {
+        const off = age - youngerStart;
+        return `${c0Start + off}/${c1Start + off}`;
+      })
+    : ages.map(String);
 
   const datasets = [];
 
@@ -149,20 +160,24 @@ export function updateChart(scenarioResults) {
     }
 
     // Required balance reference line (first scenario only) — declining curve from
-    // freedomAge to planToAge, showing how much is needed at each age to fund the
-    // remaining income stream. Reaches zero at planToAge.
+    // freedomAge to planToAge. Uses actual projected pension income at each age so
+    // the line shows what the portfolio itself needs to hold (net of pension supplement).
+    // Being below this line is fine when pension is filling the gap.
     if (datasets.length <= 2 && result.requiredLump > 0 && result.freedomAge) {
-      const { freedomAge, planToAge: pta, desiredIncome, returnRate } = result;
+      const { freedomAge, planToAge: pta, desiredIncome, returnRate, rows: projRows } = result;
       const endAge = pta ?? 95;
       const curveData = ages.map(age => {
         if (age < freedomAge) return null;
         const remaining = Math.max(0, endAge - age);
         if (remaining === 0) return 0;
+        const row = projRows?.find(r => r.chartAge === age);
+        const pensionIncome = row?.pensionIncome ?? 0;
         const nominalIncome = desiredIncome * Math.pow(1 + INFLATION, age - freedomAge);
-        return requiredBalance(nominalIncome, returnRate, remaining);
+        const netIncome = Math.max(0, nominalIncome - pensionIncome);
+        return requiredBalance(netIncome, returnRate, remaining);
       });
       datasets.push({
-        label: 'Required balance',
+        label: 'Min portfolio needed',
         data: curveData,
         borderColor: '#94a3b8',
         backgroundColor: 'transparent',
@@ -266,7 +281,12 @@ export function updateDebtChart(scenarioResults) {
     borderWidth: 2,
   }));
 
-  debtChartInstance.data.labels = ages.map(String);
+  const dc0Start = result.clientStartAges?.[0];
+  const dc1Start = result.clientStartAges?.[1];
+  const dYounger = result.youngerStart;
+  debtChartInstance.data.labels = (dc0Start != null && dc1Start != null && dYounger != null)
+    ? ages.map(age => { const off = age - dYounger; return `${dc0Start + off}/${dc1Start + off}`; })
+    : ages.map(String);
   debtChartInstance.data.datasets = datasets;
   debtChartInstance.update('none');
   updateDebtLegend(result.debtNames);
