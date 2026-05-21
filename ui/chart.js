@@ -5,46 +5,12 @@ import { INFLATION } from '../data/parameters.js';
 
 let chartInstance = null;
 
-// Draws the depletion marker as a canvas overlay rather than a data spike,
-// so it never inflates the y-axis scale.
-const depletionPlugin = {
-  id: 'depletionMarker',
-  afterDraw(chart) {
-    const idx = chart._depletionIdx;
-    if (idx == null || idx < 0) return;
-    const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
-    const xPos = x.getPixelForTick(idx);
-    if (!xPos) return;
-    ctx.save();
-    // Dashed vertical line
-    ctx.strokeStyle = '#dc2626';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([5, 4]);
-    ctx.globalAlpha = 0.7;
-    ctx.beginPath();
-    ctx.moveTo(xPos, top);
-    ctx.lineTo(xPos, bottom);
-    ctx.stroke();
-    // Solid downward triangle at the top of the line
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#dc2626';
-    ctx.beginPath();
-    ctx.moveTo(xPos - 7, top + 1);
-    ctx.lineTo(xPos + 7, top + 1);
-    ctx.lineTo(xPos, top + 13);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  },
-};
-
 export function initChart(canvasId) {
   const ctx = document.getElementById(canvasId).getContext('2d');
   chartInstance = new Chart(ctx, {
     type: 'line',
     data: { labels: [], datasets: [] },
-    plugins: [depletionPlugin],
+    plugins: [],
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -202,13 +168,6 @@ export function updateChart(scenarioResults) {
       } // end if curveStart
     }
   }
-
-  // Depletion marker: stored on the instance and drawn by depletionPlugin.
-  // Using a canvas overlay (not a data point) so it never inflates the y-axis.
-  const firstResult = scenarioResults[0]?.result;
-  chartInstance._depletionIdx = firstResult?.depletionAge
-    ? ages.indexOf(firstResult.depletionAge)
-    : -1;
 
   chartInstance.data.labels   = labels;
   chartInstance.data.datasets = datasets;

@@ -101,7 +101,7 @@ function updateOutputs(result) {
   const {
     retirementBalance, requiredLump, gap,
     depletionAge, yearsFullyFunded,
-    pensionStartAge, lastPensionResult, returnRate,
+    pensionStartAge, firstPensionResult, returnRate,
   } = result;
 
   // Risk card
@@ -131,39 +131,26 @@ function updateOutputs(result) {
     sub.textContent   = `Funds deplete ~${gap_yrs} year${gap_yrs !== 1 ? 's' : ''} before plan-to age ${planTo}`;
   }
 
-  // Gap card
-  setText('gapAmount',    gap > 0 ? fmt(gap) : 'No gap ✓');
+  // Opening balance / self-funded gap card
+  setText('gapAmount',    gap > 0 ? fmt(gap) : 'Self-funded ✓');
   setText('balAmount',    fmt(retirementBalance));
   setText('targetAmount', fmt(requiredLump));
   setText('returnRate',   fmtPct(returnRate));
   document.getElementById('gapAmount').style.color = gap > 0 ? '#991b1b' : '#15803d';
 
-  // Pension card
+  // Pension card — use first-year result so it reflects actual entitlement at eligibility age
   if (pensionStartAge) {
     setText('pensionStartAge', `Age ${pensionStartAge}`);
-    if (lastPensionResult) {
-      const ann = lastPensionResult.annualPension;
-      setText('pensionStatus',  lastPensionResult.fullPension ? 'Full pension' : lastPensionResult.partPension ? 'Part pension' : '');
-      setText('pensionDetail',  `~${fmt(ann)}/yr — ${lastPensionResult.binding} test applies`);
+    if (firstPensionResult) {
+      const ann = firstPensionResult.annualPension;
+      setText('pensionStatus',  firstPensionResult.fullPension ? 'Full pension' : firstPensionResult.partPension ? 'Part pension' : '');
+      setText('pensionDetail',  `~${fmt(ann)}/yr — ${firstPensionResult.binding} test applies`);
     }
   } else {
     setText('pensionStartAge', state.pension.include ? 'Not eligible' : 'Excluded');
     setText('pensionStatus', '');
     setText('pensionDetail', state.pension.include ? '' : 'Enable in Age Pension settings');
   }
-
-  // Key metrics
-  const c = state.clients;
-  const jFreedom = Math.max(c[0].freedomAge, c[1].freedomAge);
-  const oldestNow = Math.min(c[0].currentAge, c[1].currentAge);
-  const yearsTo   = Math.max(0, jFreedom - oldestNow);
-  const planYears = Math.max(1, planTo - jFreedom);
-  const annShort  = gap > 0 ? gap / planYears : 0;
-
-  setText('yearsToRet', yearsTo > 0 ? `${yearsTo} years` : 'Retired');
-  setText('yearsFunded', `${yearsFullyFunded} of ${planYears}`);
-  setText('annualGap',   annShort > 0 ? fmt(annShort) + '/yr' : 'None ✓');
-  setText('safeEarn',    fmt(safeEarnAmount(true)));
 
   // Pension explainer
   setText('ap_full', fmt(PENSION.assetFull.couple.homeowner));
@@ -602,7 +589,7 @@ function updateChartLegend(results) {
     wrap.appendChild(document.createTextNode(scenario.name));
     container.appendChild(wrap);
   }
-  for (const [color, label] of [['#94a3b8','Min portfolio needed'],['#dc2626','Depletion']]) {
+  for (const [color, label] of [['#94a3b8','Min portfolio needed']]) {
     const wrap = document.createElement('span');
     wrap.className = 'flex items-center';
     const dot  = document.createElement('span');

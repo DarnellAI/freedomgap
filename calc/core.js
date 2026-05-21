@@ -75,6 +75,7 @@ export function runProjection(params, applySequencing = false) {
   let firstDDYear    = true;
   let retirementCombined = 0;
   let pensionStartAge = null;
+  let firstPensionResult = null;
   let lastPensionResult = null;
   const rows         = [];
 
@@ -393,7 +394,10 @@ export function runProjection(params, applySequencing = false) {
           });
           pensionIncome = penRes.annualPension;
           lastPensionResult = penRes;
-          if (pensionStartAge === null && pensionIncome > 0) pensionStartAge = youngestAge;
+          if (pensionStartAge === null && pensionIncome > 0) {
+            pensionStartAge    = youngestAge;
+            firstPensionResult = penRes;
+          }
           row.pension = penRes;
         }
       }
@@ -463,6 +467,7 @@ export function runProjection(params, applySequencing = false) {
     desiredIncome: firstPhaseIncome,
     debtNames: debtState.map(db => db.name),
     pensionStartAge,
+    firstPensionResult,
     lastPensionResult,
     safeEarn: safeEarnAmount(true),
     safeEarnSingle: safeEarnAmount(false),
