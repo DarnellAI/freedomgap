@@ -384,7 +384,12 @@ export function runProjection(params, applySequencing = false) {
       if (drawdownYear <= planYears && newBal >= desiredNominal * (1 + INFLATION)) yearsFullyFunded++;
 
       combinedBal   = Math.max(0, newBal);
-      row.totalWealth = combinedBal + (agedCareBal ?? 0);
+      // Include still-working partner's separate super so total wealth tracks smoothly
+      const stillWorkingSuper = cs.reduce(
+        (sum, st) => (!st.alive || st.atFreedom) ? sum : sum + st.accum + st.pension, 0
+      );
+      row.stillWorkingSuper = stillWorkingSuper;
+      row.totalWealth = combinedBal + stillWorkingSuper + (agedCareBal ?? 0);
     } else {
       row.totalWealth = cs.reduce((sum, st) => sum + st.pension + st.accum, 0) + nonSuper;
     }

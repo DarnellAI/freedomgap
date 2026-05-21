@@ -425,9 +425,10 @@ function exportWorkingsXLSX() {
   // ── Sheet 3: Drawdown ────────────────────────────────────────────────────────
   const dHdr = [
     'Age (C1/C2)', `${c[0].name} Age`, `${c[1].name} Age`, 'Retirement Year',
-    'Opening Balance', `Return @ ${rPct}%`, 'Desired Income (nominal)',
-    'Age Pension', 'Working Partner Income', 'Debt Repayments', 'Net Portfolio Draw',
-    'Min Drawdown', 'Closing Balance',
+    'Opening Pool', `Return @ ${rPct}%`, 'Desired Income (nominal)',
+    'Age Pension', 'Working Partner Income', 'Working Partner Super (outside pool)',
+    'Debt Repayments', 'Net Portfolio Draw',
+    'Min Drawdown', 'Closing Pool', 'Total Wealth (Pool + Partner Super)',
     'Pension — Asset Test', 'Pension — Income Test', 'Pension Binding',
     'Notes',
   ];
@@ -440,6 +441,7 @@ function exportWorkingsXLSX() {
       row.sequencingShock        ? '-25% sequencing shock'            : '',
       row.agedCareSetup          ? 'Aged care reserve set aside'      : '',
     ].filter(Boolean).join('; ');
+    const partnerSuper = row.stillWorkingSuper ?? 0;
     return [
       ageLabel(row.chartAge), clientAge(0, row.chartAge), clientAge(1, row.chartAge), row.dd,
       row.startBalance       ?? 0,
@@ -447,10 +449,12 @@ function exportWorkingsXLSX() {
       row.desiredNominal     ?? 0,
       row.pensionIncome      ?? 0,
       row.workingNetIncome   ?? 0,
+      partnerSuper,
       row.debtRepaymentYr    ?? 0,
       row.drawdownDraw       ?? 0,
       row.minDrawdown        ?? 0,
       row.endBalance         ?? 0,
+      (row.endBalance ?? 0) + partnerSuper,
       pr?.assetPension  ?? 0,
       pr?.incomePension ?? 0,
       pr?.binding       ?? '',
@@ -460,10 +464,10 @@ function exportWorkingsXLSX() {
   const ws3 = XLSX.utils.aoa_to_sheet([dHdr, ...dBody]);
   ws3['!cols'] = [
     { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 14 },
-    ...Array(9).fill({ wch: 20 }),
+    ...Array(11).fill({ wch: 22 }),
     { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 35 },
   ];
-  applyColFormat(ws3, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], CUR, dBody.length);
+  applyColFormat(ws3, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], CUR, dBody.length);
   XLSX.utils.book_append_sheet(wb, ws3, 'Drawdown');
 
   // ── Sheet 4: Debt Schedule ───────────────────────────────────────────────────
