@@ -200,7 +200,7 @@ function updateWorkingsTable(result, state) {
       if (sgc  > 0) parts.push(`+${d(sgc)} SGC (${(((state.shared.sgcRate ?? 0.12) * 100).toFixed(0))}%)`);
       if (ret  > 0) parts.push(`+${d(ret)} growth (${rPct}%)`);
       if (tax  > 0) parts.push(`−${d(tax)} contributions tax (15%)`);
-      if (totalDebt > 0) parts.push(`−${d(row.debtBalances?.reduce((s,_,i,a) => s + (a[i] ?? 0), 0) ?? 0)} debt balance`);
+      if (totalDebt > 0) parts.push(`−${d(totalDebt)} debt balance`);
       formula = `Super: ${d(superTotal)}${parts.length ? '  [' + parts.join('  ') + ']' : ''}`;
       if (nonSuper > 0) formula += `  ·  Non-super: ${d(nonSuper)}`;
     } else {
@@ -263,7 +263,8 @@ function exportWorkingsCSV() {
     ].filter((_, i) => !(i === 3 && !hasDebt));
     csvRows.push(cols.join(','));
   }
-  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+  // ﻿ = UTF-8 BOM — tells Excel the file is UTF-8 so special chars (−, ·) render correctly
+  const blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
   a.download = 'freedom-gap-workings.csv';
@@ -285,7 +286,7 @@ function updateChartLegend(results) {
     wrap.appendChild(document.createTextNode(scenario.name));
     container.appendChild(wrap);
   }
-  for (const [color, label] of [['#94a3b8','Required'],['#dc2626','Depletion']]) {
+  for (const [color, label] of [['#94a3b8','Min portfolio needed'],['#dc2626','Depletion']]) {
     const wrap = document.createElement('span');
     wrap.className = 'flex items-center';
     const dot  = document.createElement('span');
