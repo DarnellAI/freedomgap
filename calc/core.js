@@ -424,7 +424,10 @@ export function runProjection(params, applySequencing = false) {
       row.excessMinDraw = excessMinDraw;
       row.surplusSaving = surplusSaving;
 
-      const grossReturn = combinedBal * returnRate;
+      // In the retirement-start year the accumulation loop already grew every
+      // balance a full year (and merged the working partner's super in), so applying
+      // grossReturn here would double-count one year of return. Skip it that year.
+      const grossReturn = row.retirementStart ? 0 : combinedBal * returnRate;
       const newBal      = combinedBal + grossReturn - effectiveDraw + surplusSaving;
 
       row.dd              = drawdownYear;
