@@ -75,6 +75,7 @@ export function runProjection(params, applySequencing = false) {
   let yearsFullyFunded = 0;
   let firstDDYear    = true;
   let retirementCombined = 0;
+  let retirementInflationFactor = 1;  // (1+infl)^years-from-today-to-retirement
   let pensionStartAge = null;
   let firstPensionResult = null;
   let lastPensionResult = null;
@@ -253,7 +254,11 @@ export function runProjection(params, applySequencing = false) {
         combinedBal = pensionBal
                     + cs.reduce((sum, st) => sum + ((!st.alive || st.atFreedom) ? st.accum : 0), 0)
                     + nonSuper;
-        retirementCombined = combinedBal;
+        // Household retirement balance = the retiring partner's pool PLUS any
+        // still-working partner's super (real wealth, just not yet in the pool).
+        retirementCombined = combinedBal
+                    + cs.reduce((sum, st) => sum + ((st.alive && !st.atFreedom) ? st.accum + st.pension : 0), 0);
+        retirementInflationFactor = Math.pow(1 + INFLATION, t - 1);
         drawdownStarted    = true;
         drawdownStartAge   = chartAge;
         row.retirementStart = true;
@@ -354,7 +359,9 @@ export function runProjection(params, applySequencing = false) {
         }
       }
       const desiredBase    = phaseBase * survivalFactor;
-      const desiredNominal = desiredBase * Math.pow(1 + INFLATION, drawdownYear - 1);
+      // Income is entered in today's dollars — inflate from today (t) to this year,
+      // not from the start of drawdown, so the years before retirement are captured.
+      const desiredNominal = desiredBase * Math.pow(1 + INFLATION, t - 1);
 
       // Sequencing shock
       if (applySequencing && firstDDYear) {
@@ -462,7 +469,9 @@ export function runProjection(params, applySequencing = false) {
   }
 
   // Summary outputs — use first phase income for required lump (conservative: assumes phase-1 spending for life)
-  const firstPhaseIncome = s.incomePhases?.[0]?.income ?? s.desiredIncome ?? 0;
+  // Income is in today's dollars; inflate it to retirement start so the self-funded
+  // target and the household balance at retirement are on the same nominal basis.
+  const firstPhaseIncome = (s.incomePhases?.[0]?.income ?? s.desiredIncome ?? 0) * retirementInflationFactor;
   const requiredLump     = requiredBalance(firstPhaseIncome, returnRate, planYears);
   const retirementBalance = retirementCombined > 0 ? retirementCombined : (cs.reduce((sum, st) => sum + (st.freedomBalance ?? 0), 0) + (s.nonSuper ?? 0));
 

@@ -386,15 +386,23 @@ function exportWorkingsXLSX() {
     sum.push([]);
   }
   sum.push(['── KEY OUTPUTS', '']);
-  sum.push(['Retirement balance at freedom:', result.retirementBalance]);
+  sum.push(['Retirement balance at freedom (household):', result.retirementBalance]);
   sum.push(['Required balance (self-funded, no pension):', result.requiredLump]);
-  sum.push(['Funding gap (excl. estate target):', result.gap]);
+  sum.push(['Funding gap (excl. pension, excl. estate target):', result.gap]);
   sum.push(['Portfolio depletes at age:', result.depletionAge ?? `${planToAge}+ (fully funded)`]);
-  sum.push(['Years fully funded:', result.yearsFullyFunded]);
+  const planYearsFromFreedom = Math.max(1, planToAge - result.freedomAge);
+  sum.push([`Plan years portfolio sustained desired income (from joint freedom age ${result.freedomAge}):`, `${result.yearsFullyFunded} of ${planYearsFromFreedom}`]);
   sum.push(['Age Pension commences:', result.pensionStartAge ? `Age ${result.pensionStartAge}` : 'Not reached']);
-  if (result.lastPensionResult) {
-    sum.push(['Final year Age Pension (approx):', result.lastPensionResult.annualPension]);
-    sum.push(['Pension binding test:', result.lastPensionResult.binding]);
+  // Use last pension result within the plan-to age (not the extra trailing year)
+  const finalPensionRow = [...drawRows].reverse().find(r => r.pension);
+  const finalPension = finalPensionRow?.pension;
+  if (finalPension) {
+    sum.push(['Final year Age Pension (within plan):', finalPension.annualPension]);
+    const firstBinding = result.firstPensionResult?.binding;
+    const lastBinding  = finalPension.binding;
+    sum.push(['Pension binding test:', firstBinding && firstBinding !== lastBinding
+      ? `${firstBinding} → ${lastBinding} (see Aged Pension sheet for year-by-year)`
+      : (lastBinding ?? '—')]);
   }
   const ws1 = XLSX.utils.aoa_to_sheet(sum);
   ws1['!cols'] = [{ wch: 42 }, { wch: 28 }, { wch: 20 }, { wch: 20 }];
@@ -415,6 +423,7 @@ function exportWorkingsXLSX() {
     'Portfolio Drawdown',
     'Combined Ending Balance',
     ...(hasHomeValue ? ['Home Equity (3% p.a.)'] : []),
+    'Notes',
   ];
   const pb2Body = validRows.map((row, idx) => {
     const inDD   = row.dd != null;
@@ -433,21 +442,31 @@ function exportWorkingsXLSX() {
     const ret1 = row.return1 ?? 0;
     const tax0 = row.tax0 ?? 0;
     const tax1 = row.tax1 ?? 0;
-    // Accumulation drawdown = debt repayment from non-super; retirement drawdown = net portfolio draw
-    const draw = inDD
-      ? (row.drawdownDraw ?? 0)
-      : (row.debtDetails?.reduce((s, d) => s + d.repayment, 0) ?? 0);
+    // Portfolio drawdown is only meaningful in retirement; debt during accumulation is
+    // serviced from salary and does not reduce the investment portfolio shown here.
+    const portfolioDraw = inDD ? (row.drawdownDraw ?? 0) : 0;
+    const debtFromSalary = !inDD ? (row.debtDetails?.reduce((s, d) => s + d.repayment, 0) ?? 0) : 0;
     const endBal = row.totalWealth ?? 0;
+    const notes = [
+      row.retirementStart        ? 'Retirement begins'                                                       : '',
+      row.partnerJoinsRetirement ? 'Working partner joins pool'                                               : '',
+      row.survivorEvent          ? 'Survivor — partner deceased'                                              : '',
+      row.sequencingShock        ? '−25% sequencing shock'                                                    : '',
+      row.agedCareSetup          ? `Aged care reserve set aside: $${Math.round(row.agedCareSetup).toLocaleString()}` : '',
+      row.inheritanceToPool > 0  ? `Inheritance to portfolio: $${Math.round(row.inheritanceToPool).toLocaleString()}`  : '',
+      debtFromSalary > 0         ? `Debt repaid from salary: $${Math.round(debtFromSalary).toLocaleString()} (not from portfolio)` : '',
+    ].filter(Boolean).join('; ');
     return [
       ageLabel(row.chartAge),
       inDD ? `Drawdown yr ${row.dd}` : 'Accumulation',
-      startBal, sgc0, sgc1, surplus, ret0, ret1, tax0, tax1, draw, endBal,
+      startBal, sgc0, sgc1, surplus, ret0, ret1, tax0, tax1, portfolioDraw, endBal,
       ...(hasHomeValue ? [row.homeValue ?? 0] : []),
+      notes,
     ];
   });
   const ws2 = XLSX.utils.aoa_to_sheet([pb2Hdr, ...pb2Body]);
   const pb2NumCols = hasHomeValue ? 11 : 10;
-  ws2['!cols'] = [{ wch: 12 }, { wch: 16 }, ...Array(pb2NumCols).fill({ wch: 22 })];
+  ws2['!cols'] = [{ wch: 12 }, { wch: 16 }, ...Array(pb2NumCols).fill({ wch: 22 }), { wch: 50 }];
   applyColFormat(ws2, Array.from({ length: pb2NumCols }, (_, i) => i + 2), CUR, pb2Body.length);
   XLSX.utils.book_append_sheet(wb, ws2, 'Portfolio Balance');
 
