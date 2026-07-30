@@ -532,7 +532,7 @@ function renderPensionInputs(state, onChange) {
     rows.push(makeRow('Current home value (indexed 3% p.a. — estate context only)', numInput(pen.homeValue ?? 0, v => up('homeValue', v)), '$'));
     const homeHelp = document.createElement('p');
     homeHelp.className = 'help';
-    homeHelp.textContent = 'Home equity grows at 3% p.a. and appears as a separate dashed line on the chart. It is not part of the investable portfolio — it shows you still have estate wealth even if the portfolio depletes.';
+    homeHelp.textContent = 'Home equity grows at 3% p.a. and is shown on the risk card. It is not part of the investable portfolio — it shows you still have estate wealth even if the portfolio depletes.';
     rows.push(homeHelp);
   }
   rows.push(makeRow('Pension eligible age (currently 67 for most Australians)', ageInput(pen.pensionAge, v => up('pensionAge', v)), 'yrs'));

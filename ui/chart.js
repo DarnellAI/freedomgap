@@ -23,7 +23,11 @@ export function initChart(canvasId) {
               if (v === null || v === undefined) return '';
               return `${ctx.dataset.label}: ${fmtM(v)}`;
             },
+            afterLabel: ctx => auditLines(ctx),
           },
+          bodyFont: { size: 11 },
+          bodySpacing: 3,
+          boxPadding: 4,
         },
       },
       scales: {
@@ -50,6 +54,65 @@ function fmtM(v) {
   if (v >= 1e6)  return `$${(v / 1e6).toFixed(2)}M`;
   if (v >= 1e3)  return `$${(v / 1e3).toFixed(0)}k`;
   return `$${Math.round(v)}`;
+}
+
+// Full-precision dollars for the audit-trail tooltip
+function fmtD(v) {
+  return `$${Math.round(Math.abs(v)).toLocaleString('en-AU')}`;
+}
+
+/**
+ * Audit-trail breakdown for the hovered year — mirrors the exported
+ * spreadsheet: opening balance, returns, contributions, pension income,
+ * drawdown and closing balance, all reconciling to the plotted wealth line.
+ */
+function auditLines(ctx) {
+  const ds = ctx.dataset;
+  if (!ds._rows || ctx.raw == null) return '';
+  const age = ds._ages?.[ctx.dataIndex];
+  const row = ds._rows.find(r => r.chartAge === age);
+  if (!row) return '';
+
+  const rPct  = ((ds._rr ?? 0) * 100).toFixed(1);
+  const lines = [];
+
+  if (row.dd != null) {
+    // ── Drawdown year ──
+    const returns  = (row.grossReturn ?? 0) + (row.return0 ?? 0) + (row.return1 ?? 0);
+    const sgcGross = (row.sgc0 ?? 0) + (row.sgc1 ?? 0);
+    const taxes    = (row.tax0 ?? 0) + (row.tax1 ?? 0);
+    lines.push(`  Opening balance: ${fmtD(row.openingWealth ?? row.startBalance ?? 0)}`);
+    lines.push(`  + Investment return (${rPct}%): ${fmtD(returns)}`);
+    if (sgcGross > 0.5)                 lines.push(`  + Super contributions: ${fmtD(sgcGross)}`);
+    if (taxes > 0.5)                    lines.push(`  − Contributions tax (15%): ${fmtD(taxes)}`);
+    if ((row.pensionIncome ?? 0) > 0.5) lines.push(`  + Age Pension: ${fmtD(row.pensionIncome)}`);
+    if ((row.workingNetIncome ?? 0) > 0.5) lines.push(`  + Net salary: ${fmtD(row.workingNetIncome)}`);
+    lines.push(`  − Living costs: ${fmtD(row.desiredNominal ?? 0)}`);
+    if ((row.debtRepaymentYr ?? 0) > 0.5)  lines.push(`  − Debt repayments: ${fmtD(row.debtRepaymentYr)}`);
+    if ((row.inheritanceToPool ?? 0) > 0.5) lines.push(`  + Inheritance: ${fmtD(row.inheritanceToPool)}`);
+    lines.push(`  = Closing balance: ${fmtD(ctx.raw)}`);
+    if ((row.drawdownDraw ?? 0) > 0.5)  lines.push(`  Net drawn from portfolio: ${fmtD(row.drawdownDraw)}`);
+    else if ((row.surplusSaving ?? 0) > 0.5) lines.push(`  Surplus reinvested: ${fmtD(row.surplusSaving)}`);
+    if ((row.minDrawdown ?? 0) > 0.5)   lines.push(`  ATO min drawdown: ${fmtD(row.minDrawdown)}`);
+  } else {
+    // ── Accumulation year ──
+    const returns = (row.returnAccum ?? 0) + (row.nonSuperGrowth ?? 0);
+    lines.push(`  Opening balance: ${fmtD(row.openingWealth ?? 0)}`);
+    if ((row.sgcTotal ?? 0) > 0.5)      lines.push(`  + Super contributions: ${fmtD(row.sgcTotal)}`);
+    lines.push(`  + Investment return (${rPct}%): ${fmtD(returns)}`);
+    if ((row.taxAccum ?? 0) > 0.5)      lines.push(`  − Contributions & earnings tax (15%): ${fmtD(row.taxAccum)}`);
+    if ((row.debtFromSavings ?? 0) > 0.5) lines.push(`  − Debt repaid from savings: ${fmtD(row.debtFromSavings)}`);
+    if ((row.inheritanceToPool ?? 0) > 0.5) lines.push(`  + Inheritance: ${fmtD(row.inheritanceToPool)}`);
+    lines.push(`  = Closing balance: ${fmtD(ctx.raw)}`);
+  }
+
+  // Event flags
+  if (row.retirementStart)  lines.push('  ★ Retirement begins');
+  if (row.partnerJoinsRetirement && !row.retirementStart) lines.push('  ★ Partner joins retirement pool');
+  if (row.sequencingShock)  lines.push('  ★ −25% sequencing shock');
+  if (row.survivorEvent)    lines.push('  ★ Survivor — partner deceased');
+  if (row.agedCareSetup)    lines.push(`  ★ Aged care reserve set aside: ${fmtD(row.agedCareSetup)}`);
+  return lines;
 }
 
 /**
@@ -111,6 +174,9 @@ export function updateChart(scenarioResults) {
       pointRadius: 0,
       pointHoverRadius: 4,
       borderWidth: 2.5,
+      _rows: result.rows,
+      _ages: ages,
+      _rr:   result.returnRate,
     });
 
     // Sequencing stress overlay (dashed)
@@ -129,6 +195,9 @@ export function updateChart(scenarioResults) {
         pointRadius: 0,
         borderWidth: 1.5,
         borderDash: [5, 4],
+        _rows: sequencingResult.rows,
+        _ages: ages,
+        _rr:   sequencingResult.returnRate,
       });
     }
 

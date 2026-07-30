@@ -16,11 +16,11 @@ export const PENSION = {
     single:  { homeowner: 722000,  nonHomeowner: 980000  },
   },
   taperRate: 78,          // $/year per $1,000 over full-pension threshold
-  incomeFreeAreaPF: { couple: 380, single: 202 },
+  incomeFreeAreaPF: { couple: 380, single: 218 },
   incomeTaper: 0.5,
-  deemThreshold: { couple: 106200, single: 56400 },
-  deemLow: 0.0125,
-  deemHigh: 0.0325,
+  deemThreshold: { couple: 106200, single: 64200 },
+  deemLow: 0.0075,   // deeming rates from 1 Jul 2025
+  deemHigh: 0.0275,
   workBonusPF: 300,       // per person, from employment only
 };
 

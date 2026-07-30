@@ -413,12 +413,14 @@ function exportWorkingsXLSX() {
   // Surplus cashflow from Sheet 3 is treated as an NCC contribution.
   // Portfolio drawdown from Sheet 3 reduces the balance.
   const hasHomeValue = (state.pension?.homeValue ?? 0) > 0;
+  const hasNonSuper  = validRows.some(r => (r.nonSuperGrowth ?? 0) > 0.5);
   const pb2Hdr = [
     'Age (C1/C2)', 'Phase',
     'Combined Starting Balance',
     `SGC — ${n0}`, `SGC — ${n1}`,
     'Surplus Contribution',
     `Investment Return — ${n0}`, `Investment Return — ${n1}`,
+    ...(hasNonSuper ? ['Non-super Return'] : []),
     `Tax — ${n0}`, `Tax — ${n1}`,
     'Portfolio Drawdown',
     'Combined Ending Balance',
@@ -440,12 +442,16 @@ function exportWorkingsXLSX() {
       ? (row.grossReturn ?? 0) + (row.return0 ?? 0)
       : (row.return0 ?? 0);
     const ret1 = row.return1 ?? 0;
+    const nsRet = row.nonSuperGrowth ?? 0;
     const tax0 = row.tax0 ?? 0;
     const tax1 = row.tax1 ?? 0;
-    // Portfolio drawdown is only meaningful in retirement; debt during accumulation is
-    // serviced from salary and does not reduce the investment portfolio shown here.
-    const portfolioDraw = inDD ? (row.drawdownDraw ?? 0) : 0;
-    const debtFromSalary = !inDD ? (row.debtDetails?.reduce((s, d) => s + d.repayment, 0) ?? 0) : 0;
+    // In retirement the drawdown is the net portfolio draw; during accumulation
+    // debt service comes from non-super savings first (a real portfolio outflow),
+    // with any shortfall met from salary (not a portfolio outflow).
+    const debtRepaid      = !inDD ? (row.debtDetails?.reduce((s, d) => s + d.repayment, 0) ?? 0) : 0;
+    const debtFromSavings = !inDD ? (row.debtFromSavings ?? 0) : 0;
+    const debtFromSalary  = Math.max(0, debtRepaid - debtFromSavings);
+    const portfolioDraw = inDD ? (row.drawdownDraw ?? 0) : debtFromSavings;
     const endBal = row.totalWealth ?? 0;
     const notes = [
       row.retirementStart        ? 'Retirement begins'                                                       : '',
@@ -454,18 +460,21 @@ function exportWorkingsXLSX() {
       row.sequencingShock        ? '−25% sequencing shock'                                                    : '',
       row.agedCareSetup          ? `Aged care reserve set aside: $${Math.round(row.agedCareSetup).toLocaleString()}` : '',
       row.inheritanceToPool > 0  ? `Inheritance to portfolio: $${Math.round(row.inheritanceToPool).toLocaleString()}`  : '',
+      debtFromSavings > 0        ? `Debt repaid from savings: $${Math.round(debtFromSavings).toLocaleString()}` : '',
       debtFromSalary > 0         ? `Debt repaid from salary: $${Math.round(debtFromSalary).toLocaleString()} (not from portfolio)` : '',
     ].filter(Boolean).join('; ');
     return [
       ageLabel(row.chartAge),
       inDD ? `Drawdown yr ${row.dd}` : 'Accumulation',
-      startBal, sgc0, sgc1, surplus, ret0, ret1, tax0, tax1, portfolioDraw, endBal,
+      startBal, sgc0, sgc1, surplus, ret0, ret1,
+      ...(hasNonSuper ? [nsRet] : []),
+      tax0, tax1, portfolioDraw, endBal,
       ...(hasHomeValue ? [row.homeValue ?? 0] : []),
       notes,
     ];
   });
   const ws2 = XLSX.utils.aoa_to_sheet([pb2Hdr, ...pb2Body]);
-  const pb2NumCols = hasHomeValue ? 11 : 10;
+  const pb2NumCols = 10 + (hasHomeValue ? 1 : 0) + (hasNonSuper ? 1 : 0);
   ws2['!cols'] = [{ wch: 12 }, { wch: 16 }, ...Array(pb2NumCols).fill({ wch: 22 }), { wch: 50 }];
   applyColFormat(ws2, Array.from({ length: pb2NumCols }, (_, i) => i + 2), CUR, pb2Body.length);
   XLSX.utils.book_append_sheet(wb, ws2, 'Portfolio Balance');

@@ -5,11 +5,12 @@ import { PENSION, PENSION_INDEXATION } from '../data/parameters.js';
  * @param {object} p
  * @param {number} p.assets           - Combined assessable assets (excl. PPOR)
  * @param {number} p.financialAssets  - Portion subject to deeming
- * @param {number} p.earnedIncome     - Combined employment income (annual)
+ * @param {number} p.earnedIncome     - Combined employment income (annual) — legacy fallback
+ * @param {number[]} [p.earnedIncomes] - Per-person employment income (preferred: Work Bonus is per person)
  * @param {boolean} p.homeowner
  * @param {boolean} p.bothAlive
  */
-export function calcPension({ assets, financialAssets, earnedIncome = 0, homeowner = true, bothAlive = true, pensionYear = 0 }) {
+export function calcPension({ assets, financialAssets, earnedIncome = 0, earnedIncomes = null, homeowner = true, bothAlive = true, pensionYear = 0 }) {
   // Index all rates and thresholds at 2%/yr from the base (March 2026) rates
   const ix = Math.pow(1 + PENSION_INDEXATION, pensionYear);
   const maxAnnual   = (bothAlive ? PENSION.maxAnnualCouple   : PENSION.maxAnnualSingle) * ix;
@@ -33,9 +34,13 @@ export function calcPension({ assets, financialAssets, earnedIncome = 0, homeown
     ? financialAssets * PENSION.deemLow
     : deemThresh * PENSION.deemLow + (financialAssets - deemThresh) * PENSION.deemHigh;
 
-  // Work Bonus offsets employment income
-  const workBonusAnnual = (bothAlive ? 2 : 1) * PENSION.workBonusPF * 26;
-  const assessableEarned = Math.max(0, earnedIncome - workBonusAnnual);
+  // Work Bonus offsets employment income — $300/fortnight per person, applied
+  // against each person's OWN earnings (one partner's unused bonus cannot
+  // shelter the other's income)
+  const wbAnnual = PENSION.workBonusPF * 26;
+  const assessableEarned = earnedIncomes
+    ? earnedIncomes.reduce((s, inc) => s + Math.max(0, inc - wbAnnual), 0)
+    : Math.max(0, earnedIncome - (bothAlive ? 2 : 1) * wbAnnual);
   const totalIncome = deemedIncome + assessableEarned;
   const freeArea = (bothAlive ? PENSION.incomeFreeAreaPF.couple : PENSION.incomeFreeAreaPF.single) * 26 * ix;
   let incomePension = maxAnnual;
