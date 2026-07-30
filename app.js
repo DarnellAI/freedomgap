@@ -460,6 +460,7 @@ function exportWorkingsXLSX() {
       row.sequencingShock        ? '−25% sequencing shock'                                                    : '',
       row.agedCareSetup          ? `Aged care reserve set aside: $${Math.round(row.agedCareSetup).toLocaleString()}` : '',
       row.inheritanceToPool > 0  ? `Inheritance to portfolio: $${Math.round(row.inheritanceToPool).toLocaleString()}`  : '',
+      row.downsizerAdded > 0     ? `Downsizer contribution: $${Math.round(row.downsizerAdded).toLocaleString()}` : '',
       debtFromSavings > 0        ? `Debt repaid from savings: $${Math.round(debtFromSavings).toLocaleString()}` : '',
       debtFromSalary > 0         ? `Debt repaid from salary: $${Math.round(debtFromSalary).toLocaleString()} (not from portfolio)` : '',
     ].filter(Boolean).join('; ');
@@ -627,6 +628,55 @@ function exportWorkingsXLSX() {
   ];
   applyColFormat(ws5, [3, 4, 5, 6, 7, 8, 10], CUR, ap5Body.length);
   XLSX.utils.book_append_sheet(wb, ws5, 'Aged Pension');
+
+  // ── Sheet 6: Assumptions & Conventions ─────────────────────────────────────
+  const asm = [
+    ['ASSUMPTIONS & MODELLING CONVENTIONS', ''],
+    [],
+    ['── ECONOMIC ASSUMPTIONS', ''],
+    ['Inflation (CPI, applied to salaries & desired income):', '2.5% p.a.'],
+    ['Age Pension indexation (rates & thresholds):', '2.0% p.a. (deliberately below CPI — conservative)'],
+    ['Portfolio return:', rp ? `${rp.label} — ${(rp.rate * 100).toFixed(1)}% p.a. net` : ''],
+    ['Home value indexation (estate context only):', '3.0% p.a.'],
+    [],
+    ['── TAX', ''],
+    ['Personal income tax:', '2025-26 resident rates (16% / 30% / 37% / 45%) + LITO + 2% Medicare levy'],
+    ['Tax brackets:', 'Held constant in nominal terms (bracket creep makes later net incomes conservative)'],
+    ['Super contributions & accumulation earnings tax:', '15%'],
+    ['Pension-phase earnings tax:', '0%'],
+    [],
+    ['── SUPERANNUATION RULES', ''],
+    ['Preservation age (earliest super access):', '60 — enforced even if freedom age entered is lower'],
+    ['Concessional contributions cap:', '$30,000 p.a. (held constant)'],
+    ['Transfer Balance Cap:', '$2,000,000 per person; excess stays in accumulation'],
+    ['Downsizer contribution:', 'Max $300,000 per person, from age 55, at retirement'],
+    ['ATO minimum drawdown rates:', 'Applied by age bracket; any excess above spending is retained in the portfolio'],
+    [],
+    ['── AGE PENSION RULES (as at 20 March 2026 base)', ''],
+    ['Assets test taper:', '$78/yr per $1,000 over the full-pension threshold'],
+    ['Deeming rates:', '0.75% / 2.75% (from 1 Jul 2025)'],
+    ['Work Bonus:', '$300/fortnight per person, offset against that person\'s own employment income'],
+    ['RAD (aged care bond):', 'Exempt from pension assets test'],
+    [],
+    ['── MODELLING CONVENTIONS', ''],
+    ['Retirement timing:', 'A client retires at the START of the year they reach freedom age (no salary that year)'],
+    ['Income drawdown:', 'Annuity-due — a full year of desired income is drawn each year, offset by pension & net salary'],
+    ['Contributions timing:', 'SGC earns half a year of return (assumed spread across the year)'],
+    ['Pool merging:', 'A working partner\'s super joins the retirement pool at 67 (or their freedom age if earlier, but never before 60)'],
+    ['Survivor:', 'On first death, balances transfer to survivor within TBC; spending drops to the survivor expense factor'],
+    ['Income phases:', 'Phase boundaries are keyed to the YOUNGER partner\'s age shown on the chart'],
+    [],
+    ['── KNOWN LIMITATIONS', ''],
+    ['1.', 'Investment returns are deterministic (single rate) — no market volatility beyond the optional −25% stress test'],
+    ['2.', 'Earnings on pool amounts above the Transfer Balance Cap are not taxed at 15% inside the pool (slightly generous for balances > $2M/person)'],
+    ['3.', 'Non-super investment earnings are assumed to compound at the portfolio rate without personal income tax or CGT'],
+    ['4.', 'If retirement precedes age 60, spending is funded from non-super savings only until super becomes accessible at 60'],
+    ['5.', 'Age Pension Work Bonus income bank accrual is not modelled'],
+    ['6.', 'This is a projection tool, not personal financial advice'],
+  ];
+  const ws6 = XLSX.utils.aoa_to_sheet(asm);
+  ws6['!cols'] = [{ wch: 52 }, { wch: 95 }];
+  XLSX.utils.book_append_sheet(wb, ws6, 'Assumptions');
 
   // Trigger browser download
   const buf  = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });

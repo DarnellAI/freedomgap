@@ -25,6 +25,7 @@ export const PENSION = {
 };
 
 export const SUPER = {
+  preservationAge: 60,   // super cannot be accessed before this age
   concessionalCap: 30000,
   nccAnnual: 120000,
   nccBringForward3: 360000,

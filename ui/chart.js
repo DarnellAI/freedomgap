@@ -90,6 +90,7 @@ function auditLines(ctx) {
     lines.push(`  − Living costs: ${fmtD(row.desiredNominal ?? 0)}`);
     if ((row.debtRepaymentYr ?? 0) > 0.5)  lines.push(`  − Debt repayments: ${fmtD(row.debtRepaymentYr)}`);
     if ((row.inheritanceToPool ?? 0) > 0.5) lines.push(`  + Inheritance: ${fmtD(row.inheritanceToPool)}`);
+    if ((row.downsizerAdded ?? 0) > 0.5)   lines.push(`  + Downsizer contribution: ${fmtD(row.downsizerAdded)}`);
     lines.push(`  = Closing balance: ${fmtD(ctx.raw)}`);
     if ((row.drawdownDraw ?? 0) > 0.5)  lines.push(`  Net drawn from portfolio: ${fmtD(row.drawdownDraw)}`);
     else if ((row.surplusSaving ?? 0) > 0.5) lines.push(`  Surplus reinvested: ${fmtD(row.surplusSaving)}`);
@@ -103,6 +104,7 @@ function auditLines(ctx) {
     if ((row.taxAccum ?? 0) > 0.5)      lines.push(`  − Contributions & earnings tax (15%): ${fmtD(row.taxAccum)}`);
     if ((row.debtFromSavings ?? 0) > 0.5) lines.push(`  − Debt repaid from savings: ${fmtD(row.debtFromSavings)}`);
     if ((row.inheritanceToPool ?? 0) > 0.5) lines.push(`  + Inheritance: ${fmtD(row.inheritanceToPool)}`);
+    if ((row.downsizerAdded ?? 0) > 0.5)  lines.push(`  + Downsizer contribution: ${fmtD(row.downsizerAdded)}`);
     lines.push(`  = Closing balance: ${fmtD(ctx.raw)}`);
   }
 

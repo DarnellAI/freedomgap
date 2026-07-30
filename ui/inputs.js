@@ -219,7 +219,7 @@ function renderClientInputs(idx, state, onChange) {
     makeRow('Full-time income (gross, before tax)',  numInput(cli.ftIncome, v => up('ftIncome', v)), '$/yr'),
     makeRow('Part-time from age (when hours reduce)', ageInput(cli.ptAge, v => up('ptAge', v)), 'yrs'),
     makeRow('Part-time income (gross at reduced hours)', numInput(cli.ptIncome, v => up('ptIncome', v)), '$/yr'),
-    makeRow('Freedom age (earliest possible retirement)', ageInput(cli.freedomAge, v => up('freedomAge', v)), 'yrs'),
+    makeRow('Freedom age (retirement — super stays preserved until 60)', ageInput(cli.freedomAge, v => up('freedomAge', v)), 'yrs'),
     subhead('Superannuation'),
     makeRow('Super balance (current total, all funds)', numInput(cli.superBalance, v => up('superBalance', v)), '$'),
     makeRow('Extra concessional (salary sacrifice or personal deductible, up to cap)', numInput(cli.additionalConcessional, v => up('additionalConcessional', v)), '$/yr'),
