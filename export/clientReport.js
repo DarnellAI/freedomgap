@@ -24,6 +24,65 @@
 
 import { INFLATION } from '../data/parameters.js';
 
+// ── branding ─────────────────────────────────────────────────────────────────
+// The report is white-labelled: every colour, the wordmark treatment, the
+// people listed and the footer details come from a brand record, so one
+// generator serves any practice.
+
+export const BRAND_PRESETS = {
+  darnell: {
+    id: 'darnell',
+    name: 'Darnell Consulting',
+    shortName: 'Darnell',
+    tagline: '',
+    wordmarkStyle: 'serif',
+    colors: {
+      primary: '#1B2A4E', primaryDark: '#101B33',
+      accent: '#C9A961', accentDark: '#A8813D',
+      page: '#FAF7F0', surface: '#ffffff',
+      ink: '#22293a', muted: '#68707f', line: '#e7e2d8',
+    },
+  },
+  aspen: {
+    id: 'aspen',
+    // Palette sampled from the practice's website header and buttons.
+    name: 'Aspen Corporate Financial Planning',
+    shortName: 'Aspen',
+    tagline: 'Investment · Retirement · Superannuation · Insurance',
+    wordmarkStyle: 'caps',
+    wordmarkSplit: 2,          // "ASPEN CORPORATE" in blue, the rest in grey
+    colors: {
+      primary: '#10658C', primaryDark: '#0A4661',
+      accent: '#6C9E4C', accentDark: '#4F7736',
+      page: '#F2F5F6', surface: '#ffffff',
+      ink: '#33383D', muted: '#6E767D', line: '#DFE4E7',
+    },
+  },
+};
+
+function resolveBrand(input) {
+  const base = BRAND_PRESETS[input?.preset] ?? BRAND_PRESETS[input?.id] ?? BRAND_PRESETS.darnell;
+  const b = { ...base, ...(input || {}) };
+  b.colors = { ...base.colors, ...((input && input.colors) || {}) };
+  b.people = (input && input.people) || base.people || [];
+  b.contact = { ...(base.contact || {}), ...((input && input.contact) || {}) };
+  return b;
+}
+
+// Wordmark: caps style splits the name so the leading words carry the brand
+// colour, matching how most practice logos are set.
+function wordmark(brand) {
+  const name = brand.name || '';
+  if (brand.wordmarkStyle === 'caps') {
+    const parts = name.split(' ');
+    const n = brand.wordmarkSplit ?? Math.ceil(parts.length / 2);
+    const lead = parts.slice(0, n).join(' ');
+    const rest = parts.slice(n).join(' ');
+    return `<span class="wm-lead">${esc(lead)}</span>${rest ? ` <span class="wm-rest">${esc(rest)}</span>` : ''}`;
+  }
+  return `${esc(name)}<span class="wm-dot">.</span>`;
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function esc(s) {
@@ -61,7 +120,7 @@ function info(tip) {
 
 // ── SVG wealth chart (no library) ────────────────────────────────────────────
 
-function buildChart(result, sequencingResult) {
+function buildChart(result, sequencingResult, C) {
   const planTo = result.planToAge ?? 95;
   const rows = result.rows.filter(r => r.chartAge != null && r.chartAge <= planTo);
   if (rows.length < 2) return '';
@@ -91,12 +150,12 @@ function buildChart(result, sequencingResult) {
 
   let g = '';
   for (let v = step; v < maxY; v += step) {
-    g += `<line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" stroke="#e7e2d8" stroke-width="1"/>`
+    g += `<line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/>`
        + `<text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end" class="ax">${moneyShort(v)}</text>`;
   }
   const firstTick = Math.ceil(x0 / 5) * 5;
   for (let a = firstTick; a <= x1; a += 5) {
-    g += `<line x1="${X(a)}" y1="${T + ih}" x2="${X(a)}" y2="${T + ih + 4}" stroke="#b9b2a4"/>`
+    g += `<line x1="${X(a)}" y1="${T + ih}" x2="${X(a)}" y2="${T + ih + 4}" stroke="var(--muted)" opacity="0.5"/>`
        + `<text x="${X(a)}" y="${T + ih + 18}" text-anchor="middle" class="ax">${ageLabel(a)}</text>`;
   }
   g += `<text x="${L + iw / 2}" y="${H - 6}" text-anchor="middle" class="ax axl">Your ages</text>`;
@@ -109,33 +168,33 @@ function buildChart(result, sequencingResult) {
   if (sequencingResult) {
     const sr = sequencingResult.rows.filter(r => r.chartAge != null && r.chartAge <= planTo);
     const sp = sr.map(r => `${X(r.chartAge).toFixed(1)},${Y(r.totalWealth ?? 0).toFixed(1)}`);
-    seq = `<path d="M${sp.join('L')}" fill="none" stroke="#b45309" stroke-width="1.6" stroke-dasharray="5 4"/>`;
+    seq = `<path d="M${sp.join('L')}" fill="none" stroke="var(--warn)" stroke-width="1.6" stroke-dasharray="5 4"/>`;
   }
 
   // markers: retirement, Age Pension start, depletion
   let marks = '';
   const retA = result.drawdownStartAge;
   if (retA != null && retA >= x0 && retA <= x1) {
-    marks += `<line x1="${X(retA)}" y1="${T}" x2="${X(retA)}" y2="${T + ih}" stroke="#C9A961" stroke-width="1.4" stroke-dasharray="4 4"/>`
+    marks += `<line x1="${X(retA)}" y1="${T}" x2="${X(retA)}" y2="${T + ih}" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="4 4"/>`
            + `<text x="${X(retA) + 5}" y="${T + 12}" class="mk">Retirement</text>`;
   }
   const penRow = rows.find(r => (r.pensionIncome ?? 0) > 0);
   if (penRow) {
-    marks += `<circle cx="${X(penRow.chartAge)}" cy="${Y(penRow.totalWealth ?? 0)}" r="4.5" fill="#C9A961" stroke="#fff" stroke-width="1.5"/>`
+    marks += `<circle cx="${X(penRow.chartAge)}" cy="${Y(penRow.totalWealth ?? 0)}" r="4.5" fill="var(--accent)" stroke="#fff" stroke-width="1.5"/>`
            + `<text x="${X(penRow.chartAge) + 7}" y="${Y(penRow.totalWealth ?? 0) - 8}" class="mk">Age Pension starts</text>`;
   }
   if (result.depletionAge != null && result.depletionAge < planTo) {
     const dr = rows.find(r => r.chartAge === result.depletionAge) ?? rows[rows.length - 1];
-    marks += `<circle cx="${X(dr.chartAge)}" cy="${Y(dr.totalWealth ?? 0)}" r="4.5" fill="#991b1b" stroke="#fff" stroke-width="1.5"/>`
+    marks += `<circle cx="${X(dr.chartAge)}" cy="${Y(dr.totalWealth ?? 0)}" r="4.5" fill="var(--bad)" stroke="#fff" stroke-width="1.5"/>`
            + `<text x="${X(dr.chartAge) - 7}" y="${Y(dr.totalWealth ?? 0) - 10}" text-anchor="end" class="mk mkr">Funds run low</text>`;
   }
 
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Projected household wealth by age">
     ${g}
-    <path d="${area}" fill="#1B2A4E" opacity="0.07"/>
-    <path d="${line}" fill="none" stroke="#1B2A4E" stroke-width="2.6" stroke-linejoin="round"/>
+    <path d="${area}" fill="var(--primary)" opacity="0.07"/>
+    <path d="${line}" fill="none" stroke="var(--primary)" stroke-width="2.6" stroke-linejoin="round"/>
     ${seq}${marks}
-    <line x1="${L}" y1="${T + ih}" x2="${W - R}" y2="${T + ih}" stroke="#b9b2a4"/>
+    <line x1="${L}" y1="${T + ih}" x2="${W - R}" y2="${T + ih}" stroke="var(--muted)" opacity="0.5"/>
   </svg>`;
 }
 
@@ -245,12 +304,26 @@ function buildYearTable(result) {
 
 // ── main builder ─────────────────────────────────────────────────────────────
 
-export function buildClientReport({ state, result, sequencingResult = null, solver = null, meeting = {} }) {
+export function buildClientReport({ state, result, sequencingResult = null, solver = null, meeting = {}, brand: brandIn = null }) {
+  const brand    = resolveBrand(brandIn ?? meeting.brand ?? { name: meeting.practice });
+  const C        = brand.colors;
   const planTo   = result.planToAge ?? 95;
   const names    = state.clients.map(c => c.name || 'Client');
   const household = meeting.householdLabel || names.join(' & ');
-  const practice = meeting.practice || 'Darnell Consulting';
+  const practice = brand.name || meeting.practice || 'Darnell Consulting';
   const adviser  = meeting.adviser || '';
+
+  // Directors / advisers strip under the wordmark
+  const people = (brand.people || []).filter(p => p && p.name);
+  const peopleHtml = people.length
+    ? `<div class="people">${people.map(p =>
+        `<b>${esc(p.name)}</b>${p.title ? ` — ${esc(p.title)}` : ''}`).join(' &nbsp;·&nbsp; ')}</div>`
+    : '';
+
+  // Footer contact line
+  const ct = brand.contact || {};
+  const contactBits = [ct.phone, ct.email, ct.web, ct.address].filter(Boolean).map(esc);
+  const licenceBits = [brand.afsl, brand.licensee].filter(Boolean).map(esc);
   const funded   = result.depletionAge == null || result.depletionAge >= planTo;
   const phases   = state.shared.incomePhases?.length
     ? state.shared.incomePhases
@@ -326,20 +399,32 @@ export function buildClientReport({ state, result, sequencingResult = null, solv
 <meta name="robots" content="noindex">
 <title>${esc(household)} — Your plan at a glance</title>
 <style>
-  :root { --cream:#FAF7F0; --navy:#1B2A4E; --gold:#C9A961; --gold2:#A8813D;
-          --ink:#22293a; --muted:#68707f; --line:#e7e2d8;
-          --good:#15803d; --warn:#b45309; --bad:#991b1b; }
+  :root { --page:${C.page}; --surface:${C.surface};
+          --primary:${C.primary}; --primary-dark:${C.primaryDark};
+          --accent:${C.accent}; --accent-dark:${C.accentDark};
+          --ink:${C.ink}; --muted:${C.muted}; --line:${C.line};
+          --good:#15803d; --warn:#b45309; --bad:#991b1b;
+          /* legacy aliases so every rule below stays brand-driven */
+          --cream:var(--page); --navy:var(--primary); --gold:var(--accent); --gold2:var(--accent-dark); }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:var(--cream); color:var(--ink);
+  body { background:var(--page); color:var(--ink);
          font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
          -webkit-text-size-adjust:100%; }
   .wrap { max-width:780px; margin:0 auto; padding:20px 16px 56px; }
-  header.brand { display:flex; align-items:baseline; justify-content:space-between;
-                 gap:12px; flex-wrap:wrap; padding:10px 2px 18px; }
-  .wordmark { font-family:Georgia,'Times New Roman',serif; font-size:1.35rem;
-              font-weight:700; color:var(--navy); letter-spacing:.01em; }
-  .wordmark span { color:var(--gold2); }
+  header.brand { padding:10px 2px 16px; margin-bottom:4px; border-bottom:3px solid var(--primary); }
+  .brand-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .wordmark { font-size:1.3rem; font-weight:700; color:var(--primary); line-height:1.15; }
+  .wordmark.serif { font-family:Georgia,'Times New Roman',serif; letter-spacing:.01em; }
+  .wordmark.caps  { font-size:1.16rem; letter-spacing:.055em; text-transform:uppercase; }
+  .wm-rest { color:var(--muted); font-weight:600; }
+  .wm-dot  { color:var(--accent-dark); }
+  .tagline { font-size:.66rem; letter-spacing:.11em; text-transform:uppercase;
+             color:var(--muted); margin-top:5px; }
+  .tagline .sq { display:inline-block; width:7px; height:7px; margin-right:4px; vertical-align:.02em; }
   .prep { font-size:.8rem; color:var(--muted); text-align:right; }
+  .people { margin-top:11px; padding-top:9px; border-top:1px solid var(--line);
+            font-size:.76rem; color:var(--muted); }
+  .people b { color:var(--primary); font-weight:600; }
   .card { background:#fff; border-radius:16px; padding:22px 20px;
           box-shadow:0 1px 3px rgba(27,42,78,.08); margin-bottom:16px; }
   h2 { font-size:.78rem; letter-spacing:.08em; text-transform:uppercase;
@@ -436,9 +521,17 @@ ${meeting.sample ? '<div class="ribbon">SAMPLE</div>' : ''}
 <div class="wrap">
 
   <header class="brand">
-    <div class="wordmark">${esc(practice)}<span>.</span></div>
-    <div class="prep">Prepared for <b>${esc(household)}</b><br>
-      ${meeting.reviewDate ? `Review of ${longDate(meeting.reviewDate)}` : ''}${adviser ? ` · with ${esc(adviser)}` : ''}</div>
+    <div class="brand-top">
+      <div>
+        <div class="wordmark ${brand.wordmarkStyle === 'caps' ? 'caps' : 'serif'}">${wordmark(brand)}</div>
+        ${brand.tagline ? `<div class="tagline">
+          <span class="sq" style="background:var(--primary)"></span><span class="sq" style="background:var(--accent)"></span><span class="sq" style="background:var(--muted)"></span>
+          ${esc(brand.tagline)}</div>` : ''}
+      </div>
+      <div class="prep">Prepared for <b>${esc(household)}</b><br>
+        ${meeting.reviewDate ? `Review of ${longDate(meeting.reviewDate)}` : ''}${adviser ? ` · with ${esc(adviser)}` : ''}</div>
+    </div>
+    ${peopleHtml}
   </header>
 
   <div class="card hero ${statusClass}">
@@ -473,7 +566,7 @@ ${meeting.sample ? '<div class="ribbon">SAMPLE</div>' : ''}
 
   <div class="card">
     <h2>Your wealth over time ${info('Each point is your projected combined super and savings at that age. The gold dashed line marks retirement; the dot marks where the Age Pension begins.')}</h2>
-    ${buildChart(result, sequencingResult)}
+    ${buildChart(result, sequencingResult, brand.colors)}
     <div class="legend">
       <span><span class="sw"></span><b>Your projection</b></span>
       ${sequencingResult ? `<span><span class="sw stress"></span><b>Stress test</b> — a 25% market fall in your first retired year</span>` : ''}
@@ -517,7 +610,11 @@ ${meeting.sample ? '<div class="ribbon">SAMPLE</div>' : ''}
     <p>A projection is a structured "what if", not a promise — small changes in returns move the outcome by years, which is why we review it together ${meeting.reviewCycle ? esc(meeting.reviewCycle) : 'every year'}. This page is general information prepared for you from your review${adviser ? ` by ${esc(adviser)}` : ''}; it is not a Statement of Advice. Please keep this file private — it contains your financial details.</p>
   </div>
 
-  <footer>${esc(practice)} · Prepared ${meeting.reviewDate ? longDate(meeting.reviewDate) : ''} · Open this file any time — it works offline.</footer>
+  <footer>
+    <div><b>${esc(practice)}</b>${contactBits.length ? ' · ' + contactBits.join(' · ') : ''}</div>
+    ${licenceBits.length ? `<div style="margin-top:3px">${licenceBits.join(' · ')}</div>` : ''}
+    <div style="margin-top:3px">Prepared ${meeting.reviewDate ? longDate(meeting.reviewDate) : ''} · Open this file any time — it works offline.</div>
+  </footer>
 </div>
 
 <div id="pop" role="tooltip"></div>

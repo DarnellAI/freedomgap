@@ -72,13 +72,36 @@ const meeting = {
   ],
 };
 
+// Two branded builds from one generator — proves the report white-labels.
+const BRANDS = {
+  'client-report-sample.html': {
+    preset: 'darnell',
+    people: [{ name: 'Jackson Darnell', title: 'Director' }],
+  },
+  'client-report-aspen.html': {
+    preset: 'aspen',
+    // NOTE: placeholder names — replace with the real directors before showing
+    // this to anyone at the practice.
+    people: [
+      { name: '[Director name]', title: 'Director' },
+      { name: '[Director name]', title: 'Director' },
+    ],
+    contact: { phone: '(08) 0000 0000', email: 'advice@aspencorpfp.com.au', web: 'aspencorpfp.com.au' },
+    afsl: 'Authorised Representative — AFSL 000000',
+  },
+};
+
 const result    = runProjection(state);
 const seqResult = runProjection(state, true);
 const solver    = solveSavingsGap(state, 'sustain');
 
-const html = buildClientReport({ state, result, sequencingResult: seqResult, solver, meeting });
-
-const out = join(dirname(fileURLToPath(import.meta.url)), 'client-report-sample.html');
-writeFileSync(out, html);
-console.log(`written ${out} (${(html.length / 1024).toFixed(0)} kB)`);
+const dir = dirname(fileURLToPath(import.meta.url));
+for (const [file, brand] of Object.entries(BRANDS)) {
+  const m = { ...meeting, practice: brand.preset === 'aspen' ? 'Aspen Corporate Financial Planning' : 'Darnell Consulting',
+              adviser: brand.preset === 'aspen' ? '[Adviser]' : meeting.adviser };
+  const html = buildClientReport({ state, result, sequencingResult: seqResult, solver, meeting: m, brand });
+  const out = join(dir, file);
+  writeFileSync(out, html);
+  console.log(`written ${out} (${(html.length / 1024).toFixed(0)} kB)`);
+}
 console.log(`engine says: depletes=${result.depletionAge ?? 'never'} pensionStart=${result.pensionStartAge} solver=${solver.alreadyMet ? 'on track' : Math.round(solver.monthly) + '/mo'}`);

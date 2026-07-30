@@ -664,9 +664,42 @@ function renderMeetingInputs(state, onChange) {
     + 'The action list below starts with common review items — <b>edit or delete them</b> so they match what you actually agreed.';
   container.appendChild(help);
 
-  container.appendChild(makeRow('Practice name (shown as the brand)', textInput(m.practice, v => { m.practice = v; onChange(); })));
+  if (!m.brand) m.brand = { preset: 'darnell', people: [], contact: {} };
+  const br = m.brand;
+  if (!br.people) br.people = [];
+  if (!br.contact) br.contact = {};
+
+  container.appendChild(subhead('Branding'));
+  container.appendChild(makeRow('Colour theme (white-labels the whole report)',
+    selectInput([['darnell', 'Darnell Consulting'], ['aspen', 'Aspen Corporate']], br.preset ?? 'darnell', v => {
+      br.preset = v;
+      // Adopt the preset's practice name unless one has been typed manually
+      const presetNames = { darnell: 'Darnell Consulting', aspen: 'Aspen Corporate Financial Planning' };
+      if (!m.practice || Object.values(presetNames).includes(m.practice)) m.practice = presetNames[v];
+      br.name = m.practice;
+      renderMeetingInputs(state, onChange);
+      onChange();
+    })));
+  container.appendChild(makeRow('Practice name (shown as the brand)', textInput(m.practice, v => { m.practice = v; br.name = v; onChange(); })));
   container.appendChild(makeRow('Adviser first name (used in the copy)', textInput(m.adviser, v => { m.adviser = v; onChange(); })));
   container.appendChild(makeRow('Review date (defaults to today)', dateInput(m.reviewDate, v => { m.reviewDate = v; onChange(); })));
+
+  // Directors / advisers shown under the wordmark
+  container.appendChild(subhead('Directors / advisers shown in the header'));
+  br.people.forEach((p, i) => {
+    const row = listRow();
+    row.appendChild(lineInput(p.name, 'Full name', v => { p.name = v; onChange(); }));
+    row.appendChild(lineInput(p.title, 'Title, e.g. Director', v => { p.title = v; onChange(); }, '0 1 9rem'));
+    row.appendChild(smallBtn('✕', 'Remove person', () => { br.people.splice(i, 1); rerender(); }));
+    container.appendChild(row);
+  });
+  if (br.people.length < 6) container.appendChild(addListBtn('+ Add director / adviser', () => { br.people.push({ name: '', title: 'Director' }); rerender(); }));
+
+  container.appendChild(subhead('Footer contact details (optional)'));
+  container.appendChild(makeRow('Phone',   textInput(br.contact.phone, v => { br.contact.phone = v; onChange(); })));
+  container.appendChild(makeRow('Email',   textInput(br.contact.email, v => { br.contact.email = v; onChange(); })));
+  container.appendChild(makeRow('Website', textInput(br.contact.web,   v => { br.contact.web = v; onChange(); })));
+  container.appendChild(makeRow('AFSL / licensee line', textInput(br.afsl, v => { br.afsl = v; onChange(); })));
 
   container.appendChild(subhead('Personal note at the top of the page'));
   container.appendChild(areaInput(m.intro, 'e.g. Thanks for coming in this week — this page is the plan we walked through together.', v => { m.intro = v; onChange(); }));
