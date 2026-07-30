@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>David &amp; Margaret — Your plan at a glance</title>
+<style>
+  :root { --cream:#FAF7F0; --navy:#1B2A4E; --gold:#C9A961; --gold2:#A8813D;
+          --ink:#22293a; --muted:#68707f; --line:#e7e2d8;
+          --good:#15803d; --warn:#b45309; --bad:#991b1b; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--cream); color:var(--ink);
+         font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+         -webkit-text-size-adjust:100%; }
+  .wrap { max-width:780px; margin:0 auto; padding:20px 16px 56px; }
+  header.brand { display:flex; align-items:baseline; justify-content:space-between;
+                 gap:12px; flex-wrap:wrap; padding:10px 2px 18px; }
+  .wordmark { font-family:Georgia,'Times New Roman',serif; font-size:1.35rem;
+              font-weight:700; color:var(--navy); letter-spacing:.01em; }
+  .wordmark span { color:var(--gold2); }
+  .prep { font-size:.8rem; color:var(--muted); text-align:right; }
+  .card { background:#fff; border-radius:16px; padding:22px 20px;
+          box-shadow:0 1px 3px rgba(27,42,78,.08); margin-bottom:16px; }
+  h2 { font-size:.78rem; letter-spacing:.08em; text-transform:uppercase;
+       color:var(--gold2); margin-bottom:12px; }
+  /* hero */
+  .hero { border-top:5px solid var(--gold); }
+  .pill { display:inline-block; font-size:.72rem; font-weight:700; letter-spacing:.05em;
+          text-transform:uppercase; padding:.25rem .7rem; border-radius:2rem; color:#fff; }
+  .good .pill { background:var(--good); } .warn .pill { background:var(--warn); }
+  .bad  .pill { background:var(--bad); }
+  .hero h1 { font-size:1.5rem; line-height:1.25; margin:.6rem 0 .4rem; color:var(--navy); }
+  .hero p  { color:var(--muted); font-size:.95rem; }
+  /* tiles */
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(158px,1fr)); gap:10px; }
+  .tile { background:#fff; border-radius:14px; padding:14px 14px 12px;
+          box-shadow:0 1px 3px rgba(27,42,78,.08); }
+  .tile .l { font-size:.68rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  .tile .v { font-size:1.28rem; font-weight:700; color:var(--navy); margin:.2rem 0 .1rem; }
+  .tile .n { font-size:.72rem; color:var(--muted); line-height:1.4; }
+  /* chart */
+  svg { width:100%; height:auto; display:block; }
+  .ax  { font-size:11px; fill:var(--muted); } .axl { font-size:10px; letter-spacing:.05em; }
+  .mk  { font-size:11px; fill:var(--navy); font-weight:600; } .mkr { fill:var(--bad); }
+  .legend { display:flex; gap:18px; flex-wrap:wrap; font-size:.75rem; color:var(--muted); margin-top:8px; }
+  .legend b { font-weight:600; color:var(--ink); }
+  .sw { display:inline-block; width:18px; height:0; border-top:3px solid var(--navy);
+        vertical-align:middle; margin-right:6px; border-radius:2px; }
+  .sw.stress { border-top:2px dashed var(--warn); }
+  /* actions */
+  .actions ul { list-style:none; }
+  .actions li { border-bottom:1px solid var(--line); }
+  .actions li:last-child { border-bottom:none; }
+  .actions label { display:flex; align-items:flex-start; gap:12px; padding:11px 2px; cursor:pointer; }
+  .actions input { width:1.25rem; height:1.25rem; margin-top:.15rem; accent-color:var(--navy); flex-shrink:0; }
+  .atext { flex:1; } .atext em { color:var(--muted); font-style:normal; font-size:.85rem; }
+  input:checked ~ .atext { text-decoration:line-through; color:var(--muted); }
+  .chip { font-size:.66rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+          padding:.18rem .5rem; border-radius:2rem; flex-shrink:0; margin-top:.2rem; }
+  .chip.you { background:rgba(201,169,97,.18); color:var(--gold2); }
+  .chip.us  { background:rgba(27,42,78,.09); color:var(--navy); }
+  /* dates */
+  .dates ul { list-style:none; }
+  .dates li { display:flex; gap:14px; padding:10px 2px; border-bottom:1px solid var(--line); }
+  .dates li:last-child { border-bottom:none; }
+  .dd { min-width:96px; font-weight:700; color:var(--navy); font-size:.85rem; }
+  .dt { flex:1; } .dt em { display:block; color:var(--muted); font-style:normal; font-size:.83rem; }
+  /* strategies */
+  .strat { padding:12px 0; border-bottom:1px solid var(--line); }
+  .strat:last-child { border-bottom:none; }
+  .strat h3 { font-size:1rem; color:var(--navy); margin-bottom:.25rem; }
+  .strat p { font-size:.92rem; color:var(--ink); }
+  .impact { display:inline-block; margin-top:.45rem; font-size:.74rem; font-weight:600;
+            color:var(--gold2); background:rgba(201,169,97,.14); padding:.2rem .6rem; border-radius:2rem; }
+  /* call us */
+  .callus ul { list-style:none; columns:2; column-gap:24px; }
+  .callus li { break-inside:avoid; padding:5px 0 5px 18px; position:relative; font-size:.92rem; }
+  .callus li::before { content:""; position:absolute; left:0; top:.62em; width:8px; height:8px;
+                       border-radius:50%; background:var(--gold); }
+  @media (max-width:560px){ .callus ul { columns:1; } }
+  /* table */
+  details { margin-top:6px; }
+  summary { cursor:pointer; font-size:.85rem; font-weight:600; color:var(--navy); padding:6px 0; }
+  table { width:100%; border-collapse:collapse; font-size:.8rem; margin-top:8px; }
+  th { text-align:left; font-size:.66rem; text-transform:uppercase; letter-spacing:.05em;
+       color:var(--muted); padding:6px 8px; border-bottom:1px solid var(--line); }
+  td { padding:5px 8px; border-bottom:1px solid #f3efe6; }
+  th.n, td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  /* fine print */
+  .fine { font-size:.78rem; color:var(--muted); }
+  .fine ul { margin:.4rem 0 .6rem 1.1rem; }
+  .fine li { margin-bottom:.2rem; }
+  /* explain marks */
+  .i { display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px;
+       border-radius:50%; border:1px solid var(--gold2); color:var(--gold2); background:none;
+       font:italic 700 10px Georgia,serif; cursor:pointer; vertical-align:.12em; margin-left:2px; }
+  #pop { position:absolute; z-index:10; max-width:280px; background:var(--navy); color:#fff;
+         font-size:.78rem; line-height:1.45; padding:10px 12px; border-radius:10px;
+         box-shadow:0 6px 20px rgba(27,42,78,.35); display:none; }
+  /* sample ribbon */
+  .ribbon { position:fixed; top:14px; right:-42px; transform:rotate(38deg); z-index:20;
+            background:var(--warn); color:#fff; font-size:.7rem; font-weight:800;
+            letter-spacing:.18em; padding:.3rem 3rem; opacity:.92; pointer-events:none; }
+  footer { text-align:center; color:var(--muted); font-size:.75rem; margin-top:22px; }
+  @media print {
+    body { background:#fff; } .card,.tile { box-shadow:none; border:1px solid var(--line); }
+    .i,.ribbon { display:none; } details { open:true; }
+  }
+</style>
+</head>
+<body>
+<div class="ribbon">SAMPLE</div>
+<div class="wrap">
+
+  <header class="brand">
+    <div class="wordmark">Darnell Consulting<span>.</span></div>
+    <div class="prep">Prepared for <b>David &amp; Margaret</b><br>
+      Review of 30 July 2026 · with Jackson</div>
+  </header>
+
+  <div class="card hero good">
+    <span class="pill">On track</span>
+    <h1>Your money is projected to last beyond age 90</h1>
+    <p>That covers your plan all the way to age 90 — the age we plan to, deliberately beyond average life expectancy.</p>
+    <p style="margin-top:.6rem">Thanks for coming in this week. This page is the plan we walked through together — keep it on your phone and tick things off as they happen.</p>
+  </div>
+
+  <div class="tiles" style="margin-bottom:16px">
+    <div class="tile">
+      <div class="l">Retirement income <button class="i" type="button" data-tip="The yearly income your plan is built around, in today&#39;s dollars. The projection increases it with inflation every year so your buying power stays the same." aria-label="What is this?">i</button></div>
+      <div class="v">$90,000/yr</div>
+      <div class="n">in today's dollars, indexed with inflation</div>
+    </div>
+    <div class="tile">
+      <div class="l">At retirement <button class="i" type="button" data-tip="Your combined super and savings projected to the year you have both stopped work, in the dollars of that year." aria-label="What is this?">i</button></div>
+      <div class="v">$669k</div>
+      <div class="n">projected combined balance</div>
+    </div>
+    <div class="tile">
+      <div class="l">Age Pension <button class="i" type="button" data-tip="The government Age Pension your household is projected to receive, based on the assets and income tests. It usually grows as your own savings are drawn down." aria-label="What is this?">i</button></div>
+      <div class="v">$19,584/yr</div>
+      <div class="n">expected from age 71 (part pension, growing over time)</div>
+    </div>
+    <div class="tile">
+      <div class="l">Extra saving needed <button class="i" type="button" data-tip="The additional amount to put away, starting now, for your money to last to the plan-to age. Calculated by the same projection as the chart." aria-label="What is this?">i</button></div>
+      <div class="v">$0</div>
+      <div class="n">no extra saving needed — you are on track</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Your wealth over time <button class="i" type="button" data-tip="Each point is your projected combined super and savings at that age. The gold dashed line marks retirement; the dot marks where the Age Pension begins." aria-label="What is this?">i</button></h2>
+    <svg viewBox="0 0 720 330" role="img" aria-label="Projected household wealth by age">
+    <line x1="62" y1="216.64549128523356" x2="702" y2="216.64549128523356" stroke="#e7e2d8" stroke-width="1"/><text x="54" y="220.64549128523356" text-anchor="end" class="ax">$200k</text><line x1="62" y1="149.29098257046712" x2="702" y2="149.29098257046712" stroke="#e7e2d8" stroke-width="1"/><text x="54" y="153.29098257046712" text-anchor="end" class="ax">$400k</text><line x1="62" y1="81.93647385570068" x2="702" y2="81.93647385570068" stroke="#e7e2d8" stroke-width="1"/><text x="54" y="85.93647385570068" text-anchor="end" class="ax">$600k</text><line x1="62" y1="284" x2="62" y2="288" stroke="#b9b2a4"/><text x="62" y="302" text-anchor="middle" class="ax">66/65</text><line x1="190" y1="284" x2="190" y2="288" stroke="#b9b2a4"/><text x="190" y="302" text-anchor="middle" class="ax">71/70</text><line x1="318" y1="284" x2="318" y2="288" stroke="#b9b2a4"/><text x="318" y="302" text-anchor="middle" class="ax">76/75</text><line x1="446" y1="284" x2="446" y2="288" stroke="#b9b2a4"/><text x="446" y="302" text-anchor="middle" class="ax">81/80</text><line x1="574" y1="284" x2="574" y2="288" stroke="#b9b2a4"/><text x="574" y="302" text-anchor="middle" class="ax">86/85</text><line x1="702" y1="284" x2="702" y2="288" stroke="#b9b2a4"/><text x="702" y="302" text-anchor="middle" class="ax">91/90</text><text x="382" y="324" text-anchor="middle" class="ax axl">Your ages</text>
+    <path d="M62.0,125.6L87.6,113.7L113.2,101.1L138.8,87.8L164.4,73.7L190.0,58.8L215.6,52.3L241.2,45.9L266.8,39.4L292.4,33.1L318.0,41.6L343.6,50.3L369.2,59.1L394.8,68.1L420.4,77.3L446.0,87.6L471.6,99.1L497.2,111.9L522.8,126.2L548.4,142.1L574.0,159.7L599.6,171.8L625.2,185.3L650.8,200.1L676.4,216.4L702.0,234.3L702.0,284L62.0,284Z" fill="#1B2A4E" opacity="0.07"/>
+    <path d="M62.0,125.6L87.6,113.7L113.2,101.1L138.8,87.8L164.4,73.7L190.0,58.8L215.6,52.3L241.2,45.9L266.8,39.4L292.4,33.1L318.0,41.6L343.6,50.3L369.2,59.1L394.8,68.1L420.4,77.3L446.0,87.6L471.6,99.1L497.2,111.9L522.8,126.2L548.4,142.1L574.0,159.7L599.6,171.8L625.2,185.3L650.8,200.1L676.4,216.4L702.0,234.3" fill="none" stroke="#1B2A4E" stroke-width="2.6" stroke-linejoin="round"/>
+    <path d="M62.0,125.6L87.6,113.7L113.2,101.1L138.8,87.8L164.4,73.7L190.0,58.8L215.6,111.2L241.2,107.5L266.8,103.9L292.4,100.5L318.0,109.0L343.6,118.6L369.2,129.3L394.8,141.3L420.4,154.7L446.0,169.5L471.6,185.9L497.2,203.9L522.8,223.7L548.4,245.5L574.0,269.3L599.6,284.0L625.2,284.0L650.8,284.0L676.4,284.0L702.0,284.0" fill="none" stroke="#b45309" stroke-width="1.6" stroke-dasharray="5 4"/><line x1="215.6" y1="18" x2="215.6" y2="284" stroke="#C9A961" stroke-width="1.4" stroke-dasharray="4 4"/><text x="220.6" y="30" class="mk">Retirement</text><circle cx="215.6" cy="52.31964410412715" r="4.5" fill="#C9A961" stroke="#fff" stroke-width="1.5"/><text x="222.6" y="44.31964410412715" class="mk">Age Pension starts</text>
+    <line x1="62" y1="284" x2="702" y2="284" stroke="#b9b2a4"/>
+  </svg>
+    <div class="legend">
+      <span><span class="sw"></span><b>Your projection</b></span>
+      <span><span class="sw stress"></span><b>Stress test</b> — a 25% market fall in your first retired year</span>
+    </div>
+    <details>
+      <summary>The numbers behind the chart</summary>
+      <table>
+    <thead><tr>
+      <th>Your ages</th><th>Phase</th>
+      <th class="n">Balance <button class="i" type="button" data-tip="The projected value of your combined super and savings at the end of that year, in the dollars of that year." aria-label="What is this?">i</button></th>
+      <th class="n">In today's dollars <button class="i" type="button" data-tip="The same balance adjusted for inflation at 2.5% a year — what it would feel like in today&#39;s money." aria-label="What is this?">i</button></th>
+    </tr></thead>
+    <tbody><tr>
+      <td>66 / 65</td>
+      <td>Building up</td>
+      <td class="n">$470,314</td>
+      <td class="n">$470,314</td>
+    </tr><tr>
+      <td>67 / 66</td>
+      <td>Building up</td>
+      <td class="n">$505,607</td>
+      <td class="n">$493,275</td>
+    </tr><tr>
+      <td>68 / 67</td>
+      <td>Building up</td>
+      <td class="n">$542,982</td>
+      <td class="n">$516,818</td>
+    </tr><tr>
+      <td>69 / 68</td>
+      <td>Building up</td>
+      <td class="n">$582,554</td>
+      <td class="n">$540,959</td>
+    </tr><tr>
+      <td>70 / 69</td>
+      <td>Building up</td>
+      <td class="n">$624,441</td>
+      <td class="n">$565,712</td>
+    </tr><tr>
+      <td>71 / 70</td>
+      <td>Building up</td>
+      <td class="n">$668,768</td>
+      <td class="n">$591,093</td>
+    </tr><tr>
+      <td>72 / 71</td>
+      <td>Drawing down</td>
+      <td class="n">$687,943</td>
+      <td class="n">$593,211</td>
+    </tr><tr>
+      <td>73 / 72</td>
+      <td>Drawing down</td>
+      <td class="n">$707,085</td>
+      <td class="n">$594,846</td>
+    </tr><tr>
+      <td>74 / 73</td>
+      <td>Drawing down</td>
+      <td class="n">$726,162</td>
+      <td class="n">$595,995</td>
+    </tr><tr>
+      <td>75 / 74</td>
+      <td>Drawing down</td>
+      <td class="n">$745,142</td>
+      <td class="n">$596,656</td>
+    </tr><tr>
+      <td>76 / 75</td>
+      <td>Drawing down</td>
+      <td class="n">$719,697</td>
+      <td class="n">$562,226</td>
+    </tr><tr>
+      <td>77 / 76</td>
+      <td>Drawing down</td>
+      <td class="n">$693,879</td>
+      <td class="n">$528,836</td>
+    </tr><tr>
+      <td>78 / 77</td>
+      <td>Drawing down</td>
+      <td class="n">$667,694</td>
+      <td class="n">$496,468</td>
+    </tr><tr>
+      <td>79 / 78</td>
+      <td>Drawing down</td>
+      <td class="n">$641,147</td>
+      <td class="n">$465,101</td>
+    </tr><tr>
+      <td>80 / 79</td>
+      <td>Drawing down</td>
+      <td class="n">$613,660</td>
+      <td class="n">$434,304</td>
+    </tr><tr>
+      <td>81 / 80</td>
+      <td>Drawing down</td>
+      <td class="n">$583,123</td>
+      <td class="n">$402,626</td>
+    </tr><tr>
+      <td>82 / 81</td>
+      <td>Drawing down</td>
+      <td class="n">$549,122</td>
+      <td class="n">$369,902</td>
+    </tr><tr>
+      <td>83 / 82</td>
+      <td>Drawing down</td>
+      <td class="n">$511,033</td>
+      <td class="n">$335,848</td>
+    </tr><tr>
+      <td>84 / 83</td>
+      <td>Drawing down</td>
+      <td class="n">$468,553</td>
+      <td class="n">$300,420</td>
+    </tr><tr>
+      <td>85 / 84</td>
+      <td>Drawing down</td>
+      <td class="n">$421,360</td>
+      <td class="n">$263,572</td>
+    </tr><tr>
+      <td>86 / 85</td>
+      <td>Drawing down</td>
+      <td class="n">$369,110</td>
+      <td class="n">$225,257</td>
+    </tr><tr>
+      <td>87 / 86</td>
+      <td>Drawing down</td>
+      <td class="n">$333,080</td>
+      <td class="n">$198,311</td>
+    </tr><tr>
+      <td>88 / 87</td>
+      <td>Drawing down</td>
+      <td class="n">$293,196</td>
+      <td class="n">$170,307</td>
+    </tr><tr>
+      <td>89 / 88</td>
+      <td>Drawing down</td>
+      <td class="n">$249,179</td>
+      <td class="n">$141,209</td>
+    </tr><tr>
+      <td>90 / 89</td>
+      <td>Drawing down</td>
+      <td class="n">$200,733</td>
+      <td class="n">$110,980</td>
+    </tr><tr>
+      <td>91 / 90</td>
+      <td>Drawing down</td>
+      <td class="n">$147,543</td>
+      <td class="n">$79,583</td>
+    </tr></tbody>
+  </table>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>What we agreed <button class="i" type="button" data-tip="The strategies from your review — what we are doing and why it helps." aria-label="What is this?">i</button></h2>
+    
+    <div class="strat">
+      <h3>Part-time work does the heavy lifting</h3>
+      <p>David working part-time to 72 and Margaret to 75 means your super barely gets touched until then — it keeps compounding while salaries cover the bills.</p>
+      <span class="impact">Roughly $500k more at full retirement</span>
+    </div>
+    <div class="strat">
+      <h3>The Age Pension is part of the plan, not a fallback</h3>
+      <p>From your first fully retired year the pension covers a growing share of your income. As your own savings are drawn down, the pension automatically steps up.</p>
+      <span class="impact">Starts near $20k/yr, grows past $45k/yr</span>
+    </div>
+    <div class="strat">
+      <h3>The house stays out of the numbers</h3>
+      <p>Your home is not counted in any figure on this page. It is a genuine backstop — downsizing or equity release stays available if you ever need it.</p>
+      <span class="impact">Backstop preserved</span>
+    </div>
+  </div>
+
+  <div class="card actions">
+    <h2>Your action list <button class="i" type="button" data-tip="Tick things off as you go — ticks are saved on this device. Items marked with our name are ours to do." aria-label="What is this?">i</button></h2>
+    <ul>
+    <li>
+      <label>
+        <input type="checkbox" data-tick="0" >
+        <span class="atext">Consolidate David&#39;s two old super accounts into the main fund</span>
+        <span class="chip you">You</span>
+      </label>
+    </li>
+    <li>
+      <label>
+        <input type="checkbox" data-tick="1" >
+        <span class="atext">Confirm Margaret&#39;s fund is set to Growth (not the default option)</span>
+        <span class="chip you">You</span>
+      </label>
+    </li>
+    <li>
+      <label>
+        <input type="checkbox" data-tick="2" >
+        <span class="atext">Send us the latest statements for both funds</span>
+        <span class="chip you">You</span>
+      </label>
+    </li>
+    <li>
+      <label>
+        <input type="checkbox" data-tick="3" >
+        <span class="atext">Prepare the Age Pension application pack for age 67</span>
+        <span class="chip us">Darnell</span>
+      </label>
+    </li>
+    <li>
+      <label>
+        <input type="checkbox" data-tick="4" checked>
+        <span class="atext">Model the part-pension entitlement while David still works part-time <em>— done in this review</em></span>
+        <span class="chip us">Darnell</span>
+      </label>
+    </li></ul>
+  </div>
+
+  <div class="card dates">
+    <h2>Dates that matter</h2>
+    <ul>
+    <li>
+      <span class="dd">1 Oct 2026</span>
+      <span class="dt">Margaret turns 67 — Age Pension age<em>we lodge the application 13 weeks before</em></span>
+    </li>
+    <li>
+      <span class="dd">4 Feb 2027</span>
+      <span class="dt">Six-month check-in with Jackson<em>phone call, 30 minutes</em></span>
+    </li>
+    <li>
+      <span class="dd">20 June 2027</span>
+      <span class="dt">Last safe day for this year&#39;s super contributions<em>money must reach the fund before 30 June</em></span>
+    </li>
+    <li>
+      <span class="dd">30 July 2027</span>
+      <span class="dt">Your next annual review</span>
+    </li></ul>
+  </div>
+
+  <div class="card callus">
+    <h2>Call us before deciding, if… <button class="i" type="button" data-tip="Life events that change the plan. A quick call first usually saves money — and sometimes a lot of tax." aria-label="What is this?">i</button></h2>
+    <ul><li>Either of you decides to stop work earlier than planned</li><li>You receive an inheritance or a large gift</li><li>You are thinking about helping the kids with a house deposit</li><li>A health event changes what retirement needs to look like</li><li>Markets fall sharply and you are tempted to move to cash</li><li>You are considering downsizing the house</li></ul>
+  </div>
+
+  <div class="card fine">
+    <h2>How this projection works</h2>
+    <p>Every figure on this page comes from one projection, run with these assumptions:</p>
+    <ul>
+      <li>Investment return: <b>6.0% a year</b> after fees and fund tax, every year — real markets move around this.</li>
+      <li>Inflation: <b>2.5% a year</b>. Your target income rises with it; the plan runs to age <b>90</b>.</li>
+      <li>Age Pension: current rates and thresholds, indexed at 2% a year, applied with the assets and income tests each year.</li>
+      <li>Tax: 2025–26 personal rates; 15% on super contributions and accumulation earnings; pension-phase earnings tax-free.</li>
+      <li>Super stays preserved until age 60, and a full year of income is drawn each retired year.</li>
+    </ul>
+    <p>A projection is a structured "what if", not a promise — small changes in returns move the outcome by years, which is why we review it together every year. This page is general information prepared for you from your review by Jackson; it is not a Statement of Advice. Please keep this file private — it contains your financial details.</p>
+  </div>
+
+  <footer>Darnell Consulting · Prepared 30 July 2026 · Open this file any time — it works offline.</footer>
+</div>
+
+<div id="pop" role="tooltip"></div>
+<script>
+(function () {
+  // action ticks — saved on this device only
+  var KEY = "dc-david-margaret-2026-07-30";
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+  var boxes = document.querySelectorAll("[data-tick]");
+  boxes.forEach(function (b) {
+    var k = b.getAttribute("data-tick");
+    if (k in saved) b.checked = !!saved[k];
+    b.addEventListener("change", function () {
+      saved[k] = b.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+  // explain marks
+  var pop = document.getElementById("pop"), open = null;
+  function close() { pop.style.display = "none"; open = null; }
+  document.addEventListener("click", function (ev) {
+    var btn = ev.target.closest ? ev.target.closest(".i") : null;
+    if (!btn) { close(); return; }
+    if (open === btn) { close(); return; }
+    pop.textContent = btn.getAttribute("data-tip") || "";
+    pop.style.display = "block";
+    var r = btn.getBoundingClientRect();
+    var w = Math.min(280, window.innerWidth - 24);
+    pop.style.maxWidth = w + "px";
+    var left = Math.max(12, Math.min(r.left - 20, window.innerWidth - w - 12));
+    pop.style.left = left + window.scrollX + "px";
+    pop.style.top = r.bottom + 8 + window.scrollY + "px";
+    open = btn;
+  });
+})();
+</script>
+</body>
+</html>
