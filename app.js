@@ -913,23 +913,39 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('exportBtn').addEventListener('click', () => exportJSON(scenarios));
   document.getElementById('exportWorkingsBtn').addEventListener('click', () => exportWorkingsXLSX());
 
-  // Client take-home report — one self-contained HTML file for the ACTIVE scenario
+  // Client take-home report — one self-contained HTML file for the ACTIVE scenario.
+  // Any failure is surfaced with an alert (never a silent no-op), and the button
+  // confirms visibly because browsers often tuck downloads away out of sight.
   document.getElementById('takeHomeBtn').addEventListener('click', () => {
-    const sc     = activeScenario();
-    const state  = sc.state;
-    const result = runProjection(state);
-    const seq    = sc.showSequencing ? runProjection(state, true) : null;
-    const solver = solveSavingsGap(state, 'sustain');
-    const meeting = { ...(state.meeting ?? {}) };
-    if (!meeting.reviewDate) meeting.reviewDate = new Date().toISOString().slice(0, 10);
-    const html = buildClientReport({ state, result, sequencingResult: seq, solver, meeting });
-    const blob = new Blob([html], { type: 'text/html' });
-    const a    = document.createElement('a');
-    a.href     = URL.createObjectURL(blob);
-    const slug = state.clients.map(c => (c.name || 'client').toLowerCase().replace(/[^a-z0-9]+/g, '')).join('-');
-    a.download = `take-home-${slug || 'client'}.html`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    const btn = document.getElementById('takeHomeBtn');
+    try {
+      const sc     = activeScenario();
+      const state  = sc.state;
+      const result = runProjection(state);
+      const seq    = sc.showSequencing ? runProjection(state, true) : null;
+      const solver = solveSavingsGap(state, 'sustain');
+      const meeting = { ...(state.meeting ?? {}) };
+      if (!meeting.reviewDate) meeting.reviewDate = new Date().toISOString().slice(0, 10);
+      const html = buildClientReport({ state, result, sequencingResult: seq, solver, meeting });
+      const blob = new Blob([html], { type: 'text/html' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      const slug = state.clients.map(c => (c.name || 'client').toLowerCase().replace(/[^a-z0-9]+/g, '')).join('-');
+      a.download = `take-home-${slug || 'client'}.html`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      const prev = btn.textContent;
+      btn.textContent = 'Downloaded ✓';
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = prev; btn.disabled = false; }, 2500);
+    } catch (err) {
+      alert('Client report failed to generate:\n\n' + (err && err.message ? err.message : err)
+        + '\n\nTry a hard refresh (Ctrl+Shift+R) — an old cached version of the app may still be loaded.');
+      console.error('Client report export failed:', err);
+    }
   });
 
   document.getElementById('importBtn').addEventListener('click', () => {
