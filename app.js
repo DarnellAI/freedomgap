@@ -228,7 +228,7 @@ function updateWorkingsTable(result, state) {
     let formula = '';
     const events = [];
     if (row.retirementStart)  events.push('Retirement begins');
-    if (row.sequencingShock)  events.push('−25% sequencing shock applied');
+    if (row.sequencingLoss > 0) events.push(`−25% sequencing shock: ${d(row.sequencingLoss)} market fall`);
     if (row.survivorEvent)    events.push('Survivor mode — partner deceased');
     if (row.agedCareSetup)    events.push(`Aged care reserve: ${d(row.agedCareSetup)} set aside`);
 
@@ -457,7 +457,7 @@ function exportWorkingsXLSX() {
       row.retirementStart        ? 'Retirement begins'                                                       : '',
       row.partnerJoinsRetirement ? 'Working partner joins pool'                                               : '',
       row.survivorEvent          ? 'Survivor — partner deceased'                                              : '',
-      row.sequencingShock        ? '−25% sequencing shock'                                                    : '',
+      row.sequencingLoss > 0     ? `−25% sequencing shock: $${Math.round(row.sequencingLoss).toLocaleString()} market fall` : '',
       row.agedCareSetup          ? `Aged care reserve set aside: $${Math.round(row.agedCareSetup).toLocaleString()}` : '',
       row.inheritanceToPool > 0  ? `Inheritance to portfolio: $${Math.round(row.inheritanceToPool).toLocaleString()}`  : '',
       row.downsizerAdded > 0     ? `Downsizer contribution: $${Math.round(row.downsizerAdded).toLocaleString()}` : '',
@@ -503,7 +503,7 @@ function exportWorkingsXLSX() {
       row.retirementStart        ? 'Retirement begins'               : '',
       row.partnerJoinsRetirement ? 'Working partner joins pool'       : '',
       row.survivorEvent          ? 'Survivor — partner deceased'      : '',
-      row.sequencingShock        ? '−25% sequencing shock applied'    : '',
+      row.sequencingLoss > 0     ? `−25% sequencing shock: $${Math.round(row.sequencingLoss).toLocaleString()} market fall` : '',
       row.agedCareSetup          ? `Aged care reserve: $${Math.round(row.agedCareSetup).toLocaleString()}` : '',
       row.inheritanceToPool > 0  ? `Inheritance to pool: $${Math.round(row.inheritanceToPool).toLocaleString()}` : '',
     ].filter(Boolean).join('; ');

@@ -249,14 +249,35 @@ for (const sc of SCENARIOS) {
   }
 
   // ── 2. Retirement row fires at correct year ─────────────────────────────────
-  // Drawdown starts during the year when the younger client is exactly at freedomAge
-  // (they run accumStep for their freedom-age year, then convert & allAtFreedom fires)
+  // A client retires at the START of the year they reach their freedom age.
+  // Drawdown begins at the FIRST retirement if the still-working partner's net
+  // salary no longer covers desired spending, otherwise at the last retirement —
+  // so assert the semantic invariant rather than one exact year.
   const retRow = r.rows.find(row => row.retirementStart);
+  const freedomYears = c.map(cl => cl.freedomAge - cl.currentAge + 1);
   assert(
-    `retirementStart fires at chartAge ${jointFreedom} (older person's age)`,
-    retRow && retRow.chartAge === jointFreedom,
-    retRow ? `got chartAge=${retRow.chartAge}, t=${retRow.t}` : 'no retirementStart row found'
+    `retirementStart fires between first (yr ${Math.min(...freedomYears)}) and last (yr ${Math.max(...freedomYears)}) freedom age`,
+    retRow && retRow.t >= Math.min(...freedomYears) && retRow.t <= Math.max(...freedomYears),
+    retRow ? `got t=${retRow.t}, chartAge=${retRow.chartAge}` : 'no retirementStart row found'
   );
+  if (retRow) {
+    // At least one client must be at/past their freedom age in that year
+    const someoneRetired = retRow.ages.some((a, i) => a >= c[i].freedomAge);
+    assert(
+      `At retirementStart, a client has reached freedom age (ages ${retRow.ages.join('/')})`,
+      someoneRetired,
+      `freedom ages ${c.map(cl => cl.freedomAge).join('/')}`
+    );
+    // Nobody may draw salary once they have reached their freedom age
+    const illegalSalary = r.rows.find(row =>
+      [0, 1].some(i => (row[`salary${i}`] ?? 0) > 0 && row.ages[i] >= c[i].freedomAge)
+    );
+    assert(
+      `No client earns salary at or after their freedom age`,
+      !illegalSalary,
+      illegalSalary ? `chartAge ${illegalSalary.chartAge}: ages ${illegalSalary.ages.join('/')}` : ''
+    );
+  }
 
   // ── 3. Starting balance is positive and sensible ────────────────────────────
   assert(
@@ -351,13 +372,18 @@ for (const sc of SCENARIOS) {
         `Age Pension triggered (${fmt(pensionRows[0].pension.annualPension)}/yr, binding: ${pensionRows[0].pension.binding})`,
         true, `pensionStartAge=${r.pensionStartAge}`
       );
-      // Pension amount must not exceed max
-      const maxAnnual = 47070; // couple
-      const overMax = pensionRows.find(row => row.pension.annualPension > maxAnnual + 1);
+      // Pension must not exceed the max rate INDEXED to that year (rates index
+      // at 2%/yr from today, matching the nominal basis of desired income)
+      const BASE_MAX_COUPLE = 47070, BASE_MAX_SINGLE = 31430, PENSION_IX = 0.02;
+      const overMax = pensionRows.find(row => {
+        const ix = Math.pow(1 + PENSION_IX, row.t - 1);
+        const cap = (row.pensionBothAlive ? BASE_MAX_COUPLE : BASE_MAX_SINGLE) * ix;
+        return row.pension.annualPension > cap + 1;
+      });
       assert(
-        `No pension row exceeds couple max ($${(maxAnnual/1000).toFixed(0)}k)`,
+        `No pension row exceeds the indexed max rate (base couple $${(BASE_MAX_COUPLE/1000).toFixed(0)}k @ 2%/yr)`,
         !overMax,
-        overMax ? `age ${overMax.chartAge}: ${fmt(overMax.pension.annualPension)}` : ''
+        overMax ? `age ${overMax.chartAge}: ${fmt(overMax.pension.annualPension)} vs indexed cap ${fmt((overMax.pensionBothAlive ? BASE_MAX_COUPLE : BASE_MAX_SINGLE) * Math.pow(1 + PENSION_IX, overMax.t - 1))}` : ''
       );
     } else {
       warn(`Pension included but never triggered — assets may stay above cutoff throughout`, '');
@@ -394,9 +420,10 @@ for (const sc of SCENARIOS) {
 
   // ── Scenario-specific tests ─────────────────────────────────────────────────
   if (sc === S4) {
-    // S4: survivor fires when cs[0].age > lifeExpectancy (72), i.e. age=73 → year = LE - start + 2
+    // S4: survivor fires in the year cs[0].age reaches lifeExpectancy (72),
+    // i.e. year = LE - startAge + 1
     const survRow = r.rows.find(row => row.survivorEvent);
-    const expectedSurvYear = c[0].lifeExpectancy - c[0].currentAge + 2;
+    const expectedSurvYear = c[0].lifeExpectancy - c[0].currentAge + 1;
     assert(
       `Survivor event fires at year ${expectedSurvYear} (C1 passes life expectancy ${c[0].lifeExpectancy})`,
       survRow && survRow.t === expectedSurvYear,

@@ -340,6 +340,26 @@ export function runProjection(params, applySequencing = false) {
     if (drawdownStarted) {
       drawdownYear++;
       row.dd = drawdownYear;
+
+      // Sequencing shock — a −25% market fall at the start of the first
+      // retirement year hits every invested balance, including a still-working
+      // partner's separate super. Applied before merges and contributions so
+      // the year's audit trail reconciles from the post-shock opening balance.
+      if (applySequencing && firstDDYear) {
+        let shockLoss = combinedBal * 0.25;
+        combinedBal *= 0.75;
+        pensionBal  *= 0.75;
+        for (const st of cs) {
+          if (!st.alive) continue;
+          shockLoss  += (st.accum + st.pension) * 0.25;
+          st.accum   *= 0.75;
+          st.pension *= 0.75;
+        }
+        row.sequencingLoss  = shockLoss;
+        row.sequencingShock = true;
+      }
+      if (firstDDYear) firstDDYear = false;
+
       row.startBalance = combinedBal; // pool opening balance (before merges/flows)
 
       // Super merges at pension access age (67) OR freedom age, whichever is first —
@@ -431,14 +451,6 @@ export function runProjection(params, applySequencing = false) {
       // Income is entered in today's dollars — inflate from today (t), not from
       // the start of drawdown, so the years before retirement are captured.
       const desiredNominal = desiredBase * inflator;
-
-      // Sequencing shock
-      if (applySequencing && firstDDYear) {
-        combinedBal *= 0.75;
-        pensionBal  *= 0.75;
-        row.sequencingShock = true;
-      }
-      if (firstDDYear) firstDDYear = false;
 
       // Aged care reserve
       if (ac.active) {

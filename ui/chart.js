@@ -82,6 +82,7 @@ function auditLines(ctx) {
     const sgcGross = (row.sgc0 ?? 0) + (row.sgc1 ?? 0);
     const taxes    = (row.tax0 ?? 0) + (row.tax1 ?? 0);
     lines.push(`  Opening balance: ${fmtD(row.openingWealth ?? row.startBalance ?? 0)}`);
+    if ((row.sequencingLoss ?? 0) > 0.5) lines.push(`  − Market fall (−25% stress): ${fmtD(row.sequencingLoss)}`);
     lines.push(`  + Investment return (${rPct}%): ${fmtD(returns)}`);
     if (sgcGross > 0.5)                 lines.push(`  + Super contributions: ${fmtD(sgcGross)}`);
     if (taxes > 0.5)                    lines.push(`  − Contributions tax (15%): ${fmtD(taxes)}`);
