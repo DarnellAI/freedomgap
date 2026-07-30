@@ -16,6 +16,92 @@ export function requiredBalance(desiredIncome, returnRate, years) {
 }
 
 /**
+ * Solve the extra annual saving required to close a funding gap.
+ *
+ * Answers the client question "what do I need to put away each year, starting
+ * now, to get there?" — solved against the projection engine itself so the
+ * answer is exactly consistent with the model rather than an approximation.
+ *
+ * Concessional (salary-sacrifice) capacity is used first because it is the most
+ * tax-effective; once the $30k concessional cap is reached, the remainder is
+ * solved as after-tax savings outside super.
+ *
+ * @param {object} params - Same state object as runProjection
+ * @param {'sustain'|'selfFunded'} target
+ *        'sustain'    — portfolio (with Age Pension) lasts to plan-to age
+ *        'selfFunded' — reach the self-funded lump sum, ignoring Age Pension
+ * @returns {object} { alreadyMet, years, concessional, afterTax, totalAnnual,
+ *                     monthly, capReached, unreachable }
+ */
+export function solveSavingsGap(params, target = 'sustain') {
+  const base = runProjection(params);
+  const planTo  = base.planToAge;
+  const sgcRate = params.shared.sgcRate ?? 0.12;
+
+  // Years of saving available: from today until drawdown begins
+  const years = Math.max(0, (base.drawdownStartAge ?? base.freedomAge) - base.youngerStart);
+
+  const met = res => target === 'selfFunded'
+    ? res.retirementBalance >= res.requiredLump - 1
+    : (res.depletionAge == null || res.depletionAge >= planTo);
+
+  const blank = { alreadyMet: true, years, concessional: 0, afterTax: 0, totalAnnual: 0, monthly: 0, capReached: false, unreachable: false };
+  if (met(base)) return blank;
+  if (years <= 0) return { ...blank, alreadyMet: false, unreachable: true };
+
+  // Concessional headroom per client, on today's salary basis. A client who is
+  // already retired (or earns nothing) cannot salary sacrifice.
+  const heads = params.clients.map(cli => {
+    if (cli.freedomAge <= cli.currentAge) return 0;
+    const sal = cli.currentAge >= cli.ptAge ? cli.ptIncome : cli.ftIncome;
+    if (sal <= 0) return 0;
+    return Math.max(0, SUPER.concessionalCap - sal * sgcRate - (cli.additionalConcessional ?? 0));
+  });
+  const headTotal = heads[0] + heads[1];
+
+  function trial(conc, after) {
+    const p = JSON.parse(JSON.stringify(params));
+    if (headTotal > 0 && conc > 0) {
+      p.clients.forEach((cli, i) => {
+        cli.additionalConcessional = (cli.additionalConcessional ?? 0) + conc * heads[i] / headTotal;
+      });
+    }
+    p.shared.extraSavings = (p.shared.extraSavings ?? 0) + after;
+    return runProjection(p);
+  }
+  // Bisect to the nearest dollar (tolerance-based — far fewer projections than
+  // a fixed iteration count, which matters because this runs on every keystroke)
+  function solve(lo, hi, build) {
+    let guard = 0;
+    while (hi - lo > 1 && guard++ < 40) {
+      const mid = (lo + hi) / 2;
+      if (met(build(mid))) hi = mid; else lo = mid;
+    }
+    return hi;
+  }
+
+  // 1. Try to close the gap with salary sacrifice alone
+  if (headTotal > 0 && met(trial(headTotal, 0))) {
+    const conc = solve(0, headTotal, x => trial(x, 0));
+    return { alreadyMet: false, years, concessional: conc, afterTax: 0,
+             totalAnnual: conc, monthly: conc / 12, capReached: false, unreachable: false };
+  }
+
+  // 2. Max out salary sacrifice, then solve the remainder as after-tax savings
+  const conc = headTotal;
+  let hi = 1000;
+  while (hi < 5e6 && !met(trial(conc, hi))) hi *= 2;
+  if (!met(trial(conc, hi))) {
+    return { alreadyMet: false, years, concessional: conc, afterTax: 0,
+             totalAnnual: conc, monthly: conc / 12, capReached: headTotal > 0, unreachable: true };
+  }
+  const after = solve(0, hi, x => trial(conc, x));
+  return { alreadyMet: false, years, concessional: conc, afterTax: after,
+           totalAnnual: conc + after, monthly: (conc + after) / 12,
+           capReached: headTotal > 0, unreachable: false };
+}
+
+/**
  * Run a full year-by-year projection.
  *
  * Year conventions (all events at START of the projection year):
@@ -54,6 +140,7 @@ export function runProjection(params, applySequencing = false) {
 
   const returnRate   = getReturnRate(s.returnProfile);
   const sgcRate      = s.sgcRate ?? 0.12;
+  const extraSavings = s.extraSavings ?? 0;   // recurring after-tax savings p.a.
   const jointFreedom = Math.max(c[0].freedomAge, c[1].freedomAge);
   const youngerStartAge = Math.min(c[0].currentAge, c[1].currentAge);
   const totalYears   = (s.planToAge ?? 95) - youngerStartAge + 2;
@@ -259,6 +346,13 @@ export function runProjection(params, applySequencing = false) {
       const debtFromSavings = Math.min(nonSuper, debtRepaymentThisYear);
       row.debtFromSavings = debtFromSavings;
       nonSuper -= debtFromSavings;
+
+      // Recurring after-tax savings (added at year end, so growth starts next
+      // year — the conservative convention). Used by the savings-gap solver.
+      if (extraSavings > 0 && cs.some((st, i) => st.alive && st.working)) {
+        nonSuper += extraSavings;
+        row.extraSavings = extraSavings;
+      }
     }
 
     // ── Inheritances ───────────────────────────────────────────────────────────

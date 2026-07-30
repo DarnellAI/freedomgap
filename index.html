@@ -127,16 +127,22 @@
       <div id="homeEquityLine" class="hidden mt-3 pt-3 border-t border-current border-opacity-20 text-xs opacity-80"></div>
     </div>
 
-    <!-- Self-funded gap -->
+    <!-- Savings gap — what to put away from today -->
     <div class="rounded-2xl bg-white shadow-sm p-6">
-      <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Super top-up needed</div>
-      <div id="gapAmount"  class="text-3xl font-bold text-[#1B2A4E]">—</div>
-      <div class="mt-1 text-[11px] text-slate-400 mb-3">Self-funded basis — pension bridges the gap</div>
+      <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Extra savings needed</div>
+      <div class="flex items-baseline gap-1.5">
+        <div id="saveMonthly" class="text-3xl font-bold text-[#1B2A4E]">—</div>
+        <div id="saveMonthlyUnit" class="text-sm font-medium text-slate-500"></div>
+      </div>
+      <div id="saveSubtext" class="mt-1 text-[11px] text-slate-400 mb-3">&nbsp;</div>
+      <div id="saveSplit" class="hidden mb-3 text-[11px] leading-relaxed text-slate-500 bg-slate-50 rounded-lg px-3 py-2"></div>
       <div class="text-sm text-slate-600 grid grid-cols-2 gap-y-1">
-        <div><span class="text-slate-400">Opening super</span></div>
+        <div><span class="text-slate-400">Projected at retirement</span></div>
         <div id="balAmount"    class="font-semibold text-right">—</div>
         <div><span class="text-slate-400">Self-funded target</span></div>
         <div id="targetAmount" class="font-semibold text-right">—</div>
+        <div><span class="text-slate-400">Shortfall</span></div>
+        <div id="gapAmount"    class="font-semibold text-right">—</div>
         <div><span class="text-slate-400">Return</span></div>
         <div id="returnRate"   class="font-semibold text-right">—</div>
       </div>

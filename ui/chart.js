@@ -51,8 +51,9 @@ export function initChart(canvasId) {
 }
 
 function fmtM(v) {
-  if (v >= 1e6)  return `$${(v / 1e6).toFixed(2)}M`;
-  if (v >= 1e3)  return `$${(v / 1e3).toFixed(0)}k`;
+  // 999,600 must read as $1.00M, not $1000k — promote before rounding to k
+  if (v >= 999500) return `$${(v / 1e6).toFixed(2)}M`;
+  if (v >= 1e3)    return `$${Math.round(v / 1e3)}k`;
   return `$${Math.round(v)}`;
 }
 
@@ -93,7 +94,10 @@ function auditLines(ctx) {
     if ((row.inheritanceToPool ?? 0) > 0.5) lines.push(`  + Inheritance: ${fmtD(row.inheritanceToPool)}`);
     if ((row.downsizerAdded ?? 0) > 0.5)   lines.push(`  + Downsizer contribution: ${fmtD(row.downsizerAdded)}`);
     lines.push(`  = Closing balance: ${fmtD(ctx.raw)}`);
-    if ((row.drawdownDraw ?? 0) > 0.5)  lines.push(`  Net drawn from portfolio: ${fmtD(row.drawdownDraw)}`);
+    // Net movement for the year: closing − opening (negative = portfolio shrank)
+    const net = ctx.raw - (row.openingWealth ?? row.startBalance ?? 0);
+    lines.push(`  Net change this year: ${net < 0 ? '−' : '+'}${fmtD(net)}`);
+    if ((row.drawdownDraw ?? 0) > 0.5)  lines.push(`  Withdrawn to fund living costs: ${fmtD(row.drawdownDraw)}`);
     else if ((row.surplusSaving ?? 0) > 0.5) lines.push(`  Surplus reinvested: ${fmtD(row.surplusSaving)}`);
     if ((row.minDrawdown ?? 0) > 0.5)   lines.push(`  ATO min drawdown: ${fmtD(row.minDrawdown)}`);
   } else {
@@ -106,7 +110,10 @@ function auditLines(ctx) {
     if ((row.debtFromSavings ?? 0) > 0.5) lines.push(`  − Debt repaid from savings: ${fmtD(row.debtFromSavings)}`);
     if ((row.inheritanceToPool ?? 0) > 0.5) lines.push(`  + Inheritance: ${fmtD(row.inheritanceToPool)}`);
     if ((row.downsizerAdded ?? 0) > 0.5)  lines.push(`  + Downsizer contribution: ${fmtD(row.downsizerAdded)}`);
+    if ((row.extraSavings ?? 0) > 0.5)    lines.push(`  + Additional savings: ${fmtD(row.extraSavings)}`);
     lines.push(`  = Closing balance: ${fmtD(ctx.raw)}`);
+    const net = ctx.raw - (row.openingWealth ?? 0);
+    lines.push(`  Net change this year: ${net < 0 ? '−' : '+'}${fmtD(net)}`);
   }
 
   // Event flags

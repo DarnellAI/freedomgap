@@ -1,5 +1,5 @@
 import { DEFAULT_STATE, PENSION, SCENARIO_COLORS, SCENARIO_NAMES, MAX_SCENARIOS, RETURN_PROFILES } from './data/parameters.js';
-import { runProjection } from './calc/core.js';
+import { runProjection, solveSavingsGap } from './calc/core.js';
 import { safeEarnAmount } from './calc/pension.js';
 import { initChart, updateChart, initDebtChart, updateDebtChart } from './ui/chart.js';
 import { renderInputs } from './ui/inputs.js';
@@ -89,7 +89,7 @@ function recalc() {
   }
 
   const primary = results.find(r => r.scenario.id === activeId) ?? results[0];
-  if (primary) updateOutputs(primary.result);
+  if (primary) updateOutputs(primary.result, primary.scenario.state);
   updateChart(results);
   updateChartLegend(results);
   updateDebtChart(results);
@@ -100,13 +100,21 @@ function recalc() {
 // ── Formatted outputs ──────────────────────────────────────────────────────────
 function fmt(n) {
   if (n == null || isNaN(n)) return '—';
-  if (n >= 1e6)  return `$${(n / 1e6).toFixed(2)}M`;
-  if (n >= 1e3)  return `$${(n / 1e3).toFixed(0)}k`;
-  return `$${Math.round(n).toLocaleString()}`;
+  const a = Math.abs(n);
+  // 999,600 must read as $1.00M, not $1000k — promote before rounding to k
+  const s = a >= 999500 ? `$${(a / 1e6).toFixed(2)}M`
+          : a >= 1e3    ? `$${Math.round(a / 1e3)}k`
+          : `$${Math.round(a).toLocaleString()}`;
+  return n < 0 ? `−${s}` : s;
+}
+// Exact dollars — used where a client needs an actionable figure, not a rounded one
+function fmtExact(n) {
+  if (n == null || isNaN(n)) return '—';
+  return `$${Math.round(n).toLocaleString('en-AU')}`;
 }
 function fmtPct(r) { return r != null ? `${(r * 100).toFixed(1)}%` : '—'; }
 
-function updateOutputs(result) {
+function updateOutputs(result, state) {
   const {
     retirementBalance, requiredLump, gap,
     depletionAge, yearsFullyFunded,
@@ -115,7 +123,6 @@ function updateOutputs(result) {
 
   // Risk card
   const card  = document.getElementById('riskCard');
-  const state = activeScenario().state;
   const planTo = state.shared.planToAge ?? 95;
   card.className = 'rounded-2xl shadow-sm p-6 transition-all duration-300 ';
   const depEl = document.getElementById('riskAge');
@@ -158,12 +165,65 @@ function updateOutputs(result) {
     }
   }
 
-  // Opening balance / self-funded gap card
-  setText('gapAmount',    gap > 0 ? fmt(gap) : 'Self-funded ✓');
+  // Savings gap card — supporting figures
+  setText('gapAmount',    gap > 0 ? fmt(gap) : 'None ✓');
   setText('balAmount',    fmt(retirementBalance));
   setText('targetAmount', fmt(requiredLump));
   setText('returnRate',   fmtPct(returnRate));
   document.getElementById('gapAmount').style.color = gap > 0 ? '#991b1b' : '#15803d';
+
+  // ── Headline: what to put away each year, starting today ──────────────────
+  // 'sustain' is the number that decides whether they run out; the self-funded
+  // figure is shown alongside as the stretch target.
+  const sustain    = solveSavingsGap(state, 'sustain');
+  const selfFunded = solveSavingsGap(state, 'selfFunded');
+  const amtEl   = document.getElementById('saveMonthly');
+  const unitEl  = document.getElementById('saveMonthlyUnit');
+  const subEl   = document.getElementById('saveSubtext');
+  const splitEl = document.getElementById('saveSplit');
+
+  const retireBy = (result.drawdownStartAge ?? result.freedomAge);
+  if (sustain.alreadyMet) {
+    amtEl.textContent  = '$0';
+    amtEl.style.color  = '#15803d';
+    unitEl.textContent = '/mo';
+    subEl.textContent  = `On track — funds last to age ${planTo} with no extra saving`;
+  } else if (sustain.unreachable) {
+    amtEl.textContent  = 'Review';
+    amtEl.style.color  = '#991b1b';
+    unitEl.textContent = '';
+    subEl.textContent  = sustain.years <= 0
+      ? 'Already retired — adjust income, plan-to age or return instead'
+      : 'Gap cannot be closed by saving alone in the time available';
+  } else {
+    amtEl.textContent  = fmtExact(sustain.monthly);
+    amtEl.style.color  = '#991b1b';
+    unitEl.textContent = '/mo';
+    subEl.textContent  = `${fmtExact(sustain.totalAnnual)}/yr for ${sustain.years} yr${sustain.years === 1 ? '' : 's'} — so funds last to age ${planTo}`;
+  }
+
+  // Breakdown: salary sacrifice vs after-tax, plus the self-funded stretch target
+  const parts = [];
+  if (!sustain.alreadyMet && !sustain.unreachable) {
+    if (sustain.concessional > 0 && sustain.afterTax > 0) {
+      parts.push(`<b>How:</b> ${fmtExact(sustain.concessional)}/yr salary sacrifice (concessional cap reached) + ${fmtExact(sustain.afterTax)}/yr after-tax savings`);
+    } else if (sustain.concessional > 0) {
+      parts.push(`<b>How:</b> ${fmtExact(sustain.concessional)}/yr of salary sacrifice — within the $30k concessional cap`);
+    } else {
+      parts.push(`<b>How:</b> ${fmtExact(sustain.afterTax)}/yr after-tax savings (no salary-sacrifice capacity left)`);
+    }
+  }
+  if (!selfFunded.alreadyMet && !selfFunded.unreachable && selfFunded.totalAnnual > sustain.totalAnnual + 1) {
+    parts.push(`<b>Fully self-funded</b> (ignoring Age Pension): ${fmtExact(selfFunded.monthly)}/mo · ${fmtExact(selfFunded.totalAnnual)}/yr`);
+  } else if (selfFunded.alreadyMet && !sustain.alreadyMet) {
+    parts.push('Already above the fully self-funded target.');
+  }
+  if (parts.length) {
+    splitEl.innerHTML = parts.join('<br>');
+    splitEl.classList.remove('hidden');
+  } else {
+    splitEl.classList.add('hidden');
+  }
 
   // Pension card — use first-year result so it reflects actual entitlement at eligibility age
   if (pensionStartAge) {
@@ -665,6 +725,9 @@ function exportWorkingsXLSX() {
     ['Pool merging:', 'A working partner\'s super joins the retirement pool at 67 (or their freedom age if earlier, but never before 60)'],
     ['Survivor:', 'On first death, balances transfer to survivor within TBC; spending drops to the survivor expense factor'],
     ['Income phases:', 'Phase boundaries are keyed to the YOUNGER partner\'s age shown on the chart'],
+    ['"Extra savings needed":', 'Solved against this projection engine (not a formula) as the minimum flat annual amount, starting now and continuing until retirement, that makes funds last to plan-to age'],
+    ['Savings priority:', 'Concessional (salary-sacrifice) capacity is used first up to the $30k cap, then after-tax savings outside super'],
+    ['Savings timing:', 'Treated as contributed at year end (no growth in the first year) — the conservative convention'],
     [],
     ['── KNOWN LIMITATIONS', ''],
     ['1.', 'Investment returns are deterministic (single rate) — no market volatility beyond the optional −25% stress test'],
