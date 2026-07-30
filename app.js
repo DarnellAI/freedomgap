@@ -1,14 +1,14 @@
-import { DEFAULT_STATE, PENSION, SCENARIO_COLORS, SCENARIO_NAMES, MAX_SCENARIOS, RETURN_PROFILES } from './data/parameters.js';
-import { runProjection, solveSavingsGap } from './calc/core.js';
-import { buildClientReport } from './export/clientReport.js';
-import { safeEarnAmount } from './calc/pension.js';
-import { initChart, updateChart, initDebtChart, updateDebtChart } from './ui/chart.js';
-import { renderInputs } from './ui/inputs.js';
+import { DEFAULT_STATE, PENSION, SCENARIO_COLORS, SCENARIO_NAMES, MAX_SCENARIOS, RETURN_PROFILES } from './data/parameters.js?v=202607301634';
+import { runProjection, solveSavingsGap } from './calc/core.js?v=202607301634';
+import { buildClientReport } from './export/clientReport.js?v=202607301634';
+import { safeEarnAmount } from './calc/pension.js?v=202607301634';
+import { initChart, updateChart, initDebtChart, updateDebtChart } from './ui/chart.js?v=202607301634';
+import { renderInputs } from './ui/inputs.js?v=202607301634';
 import {
   defaultScenario, loadScenarios, saveScenarios,
   exportJSON, importJSON,
   renderScenarioTabs, renderSequencingToggle,
-} from './ui/scenarios.js';
+} from './ui/scenarios.js?v=202607301634';
 
 // ── Fractional age from birth date + plan date ─────────────────────────────────
 function computeFractionalAge(birthYear, birthMonth, planDateStr) {

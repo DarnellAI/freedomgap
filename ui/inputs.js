@@ -1,7 +1,7 @@
 // Input sidebar renderer — Darnell brand, collapsible sections
 
-import { RETURN_PROFILES } from '../data/parameters.js';
-import { calcNetIncome } from '../calc/tax.js';
+import { RETURN_PROFILES } from '../data/parameters.js?v=202607301634';
+import { calcNetIncome } from '../calc/tax.js?v=202607301634';
 
 function dollar(v)  { return v == null ? '' : Math.round(v).toString(); }
 function age(v)     { return v == null ? '' : Math.round(v).toString(); }

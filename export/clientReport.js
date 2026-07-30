@@ -22,7 +22,7 @@
 //     sample:     true  // stamps a SAMPLE ribbon on the page
 //   }
 
-import { INFLATION } from '../data/parameters.js';
+import { INFLATION } from '../data/parameters.js?v=202607301634';
 
 // ── branding ─────────────────────────────────────────────────────────────────
 // The report is white-labelled: every colour, the wordmark treatment, the
