@@ -19,13 +19,17 @@ export function calcPension({ assets, financialAssets, earnedIncome = 0, earnedI
   const fullThresh  = (homeowner ? thresholds.homeowner : thresholds.nonHomeowner) * ix;
   const cutThresh   = (homeowner ? cuts.homeowner       : cuts.nonHomeowner)       * ix;
 
-  // Asset test
+  // Asset test. The taper is a RATE ($78 per $1,000 of excess) and must not be
+  // indexed: Centrelink's cut-off threshold is itself derived from it
+  // (cutThresh = fullThresh + maxAnnual / 0.078). Indexing both the taper and
+  // the thresholds double-counts indexation and drives the entitlement to nil
+  // well before the published cut-off is reached.
   let assetPension = maxAnnual;
   if (assets >= cutThresh) {
     assetPension = 0;
   } else if (assets > fullThresh) {
     const excessK = Math.floor((assets - fullThresh) / 1000);
-    assetPension = Math.max(0, maxAnnual - excessK * PENSION.taperRate * ix);
+    assetPension = Math.max(0, maxAnnual - excessK * PENSION.taperRate);
   }
 
   // Deeming on financial assets
@@ -49,6 +53,8 @@ export function calcPension({ assets, financialAssets, earnedIncome = 0, earnedI
   }
 
   const annualPension = Math.min(assetPension, incomePension);
+  // Income at which the income test alone reduces the pension to nil
+  const incomeCutThreshold = freeArea + maxAnnual / PENSION.incomeTaper;
   return {
     annualPension,
     assetPension,
@@ -60,6 +66,13 @@ export function calcPension({ assets, financialAssets, earnedIncome = 0, earnedI
     binding: assetPension <= incomePension ? 'asset' : 'income',
     fullPension: annualPension >= maxAnnual - 1,
     partPension: annualPension > 0 && annualPension < maxAnnual - 1,
+    // Thresholds actually used this year (indexed) — surfaced so the UI can
+    // explain *why* an entitlement starts, stops or is reduced
+    assets,
+    assetFullThreshold: fullThresh,
+    assetCutThreshold:  cutThresh,
+    incomeFreeArea:     freeArea,
+    incomeCutThreshold,
   };
 }
 

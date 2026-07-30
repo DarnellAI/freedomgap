@@ -238,6 +238,7 @@ function updateOutputs(result, state) {
     setText('pensionStatus', '');
     setText('pensionDetail', state.pension.include ? '' : 'Enable in Age Pension settings');
   }
+  renderPensionTrigger(result, state);
 
   // Pension explainer
   setText('ap_full', fmt(PENSION.assetFull.couple.homeowner));
@@ -247,6 +248,56 @@ function updateOutputs(result, state) {
 function setText(id, text) {
   const el = document.getElementById(id);
   if (el) el.textContent = text ?? '—';
+}
+
+/**
+ * Explain WHY the Age Pension starts (or never starts) when it does — the
+ * question an adviser gets asked immediately after seeing the start age.
+ */
+function renderPensionTrigger(result, state) {
+  const el = document.getElementById('pensionTrigger');
+  if (!el) return;
+  const { pensionTrigger: trig, pensionBlockedBy: blocked, firstPensionResult: first } = result;
+  const lines = [];
+
+  if (!state.pension?.include) {
+    el.classList.add('hidden');
+    return;
+  }
+
+  if (trig) {
+    if (trig.kind === 'age') {
+      lines.push(`<b>Starts because:</b> reached pension age ${trig.pensionAge} with assets already under the cut-off.`);
+    } else if (trig.kind === 'assessmentStart') {
+      lines.push(`<b>Starts because:</b> first assessed at age ${trig.age}, when retirement drawdown begins, already under the cut-off. Entitlement while still working is not modelled, so a part pension may be available from age ${trig.pensionAge}.`);
+    } else if (trig.kind === 'assets') {
+      lines.push(`<b>Starts because:</b> assessable assets fell below the ${fmt(trig.threshold)} assets-test cut-off — ${fmt(trig.previous)} the year before, ${fmt(trig.value)} at age ${trig.age}.`);
+      if (trig.alsoIncome) lines.push('Deemed income also fell below its cut-off in the same year.');
+    } else {
+      lines.push(`<b>Starts because:</b> assessable income fell below the ${fmt(trig.threshold)} income-test cut-off — ${fmt(trig.previous)} the year before, ${fmt(trig.value)} at age ${trig.age}.`);
+    }
+    // What it would take to reach the full rate
+    if (first && !first.fullPension && first.binding === 'asset') {
+      lines.push(`Full pension applies below ${fmt(first.assetFullThreshold)} of assessable assets.`);
+    } else if (first && !first.fullPension && first.binding === 'income') {
+      lines.push(`Full pension applies below ${fmt(first.incomeFreeArea)} of assessable income.`);
+    }
+  } else if (blocked) {
+    if (blocked.kind === 'ageNotReached') {
+      lines.push(`<b>No entitlement:</b> pension age ${blocked.pensionAge} is not reached within the projection.`);
+    } else if (blocked.kind === 'assets') {
+      lines.push(`<b>No entitlement:</b> assessable assets stay above the ${fmt(blocked.threshold)} cut-off for the whole projection (${fmt(blocked.value)} at the end).`);
+    } else {
+      lines.push(`<b>No entitlement:</b> assessable income stays above the ${fmt(blocked.threshold)} cut-off for the whole projection.`);
+    }
+  }
+
+  if (lines.length) {
+    el.innerHTML = lines.join('<br>');
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
 }
 
 // ── Calculation workings table ─────────────────────────────────────────────────
@@ -735,6 +786,7 @@ function exportWorkingsXLSX() {
     ['3.', 'Non-super investment earnings are assumed to compound at the portfolio rate without personal income tax or CGT'],
     ['4.', 'If retirement precedes age 60, spending is funded from non-super savings only until super becomes accessible at 60'],
     ['5.', 'Age Pension Work Bonus income bank accrual is not modelled'],
+    ['5a.', 'Age Pension is assessed from the year retirement drawdown begins. If that is later than pension age, any part pension payable during the remaining working years is not counted (conservative)'],
     ['6.', 'This is a projection tool, not personal financial advice'],
   ];
   const ws6 = XLSX.utils.aoa_to_sheet(asm);

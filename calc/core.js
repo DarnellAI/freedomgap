@@ -192,6 +192,8 @@ export function runProjection(params, applySequencing = false) {
   let pensionStartAge = null;
   let firstPensionResult = null;
   let lastPensionResult = null;
+  let blockedPensionResult = null;  // last age-eligible year that produced nil pension
+  let pensionTrigger = null;        // why entitlement began when it did
   const rows         = [];
 
   for (let t = 1; t <= totalYears; t++) {
@@ -589,7 +591,35 @@ export function runProjection(params, applySequencing = false) {
           if (pensionStartAge === null && pensionIncome > 0) {
             pensionStartAge    = youngestAge;
             firstPensionResult = penRes;
+            // Why does entitlement begin in THIS year? Either they have just
+            // reached pension age already under the thresholds, or they were
+            // age-eligible but over a threshold and have now crossed below it.
+            if (blockedPensionResult === null) {
+              // First year the tests were applied at all. If that is later than
+              // pension age it is because assessment begins with drawdown —
+              // entitlement during working years is not modelled.
+              const pa = pen.pensionAge ?? 67;
+              pensionTrigger = { kind: youngestAge > pa ? 'assessmentStart' : 'age',
+                                 age: youngestAge, pensionAge: pa };
+            } else if (blockedPensionResult.assetPension <= 0) {
+              pensionTrigger = {
+                kind: 'assets', age: youngestAge,
+                threshold: penRes.assetCutThreshold,
+                value:     pensionTotalAssets,
+                previous:  blockedPensionResult.assets,
+                alsoIncome: blockedPensionResult.incomePension <= 0,
+              };
+            } else {
+              pensionTrigger = {
+                kind: 'income', age: youngestAge,
+                threshold: penRes.incomeCutThreshold,
+                value:     penRes.totalIncome,
+                previous:  blockedPensionResult.totalIncome,
+              };
+            }
           }
+          // Remember the most recent year they were eligible by age but got nil
+          if (pensionIncome <= 0) blockedPensionResult = penRes;
           row.pension = penRes;
         }
       }
@@ -667,6 +697,20 @@ export function runProjection(params, applySequencing = false) {
     pensionStartAge,
     firstPensionResult,
     lastPensionResult,
+    pensionTrigger,
+    // When no entitlement ever arises, say which test kept it at nil (or that
+    // pension age is simply never reached inside the projection)
+    pensionBlockedBy: (pensionStartAge === null && pen.include)
+      ? (blockedPensionResult
+          ? { kind: blockedPensionResult.assetPension <= 0 ? 'assets' : 'income',
+              threshold: blockedPensionResult.assetPension <= 0
+                ? blockedPensionResult.assetCutThreshold
+                : blockedPensionResult.incomeCutThreshold,
+              value: blockedPensionResult.assetPension <= 0
+                ? blockedPensionResult.assets
+                : blockedPensionResult.totalIncome }
+          : { kind: 'ageNotReached', pensionAge: pen.pensionAge ?? 67 })
+      : null,
     safeEarn: safeEarnAmount(true),
     safeEarnSingle: safeEarnAmount(false),
     clientStartAges: [c[0].currentAge, c[1].currentAge],
