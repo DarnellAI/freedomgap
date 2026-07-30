@@ -139,6 +139,82 @@ function buildChart(result, sequencingResult) {
   </svg>`;
 }
 
+// ── timeline ────────────────────────────────────────────────────────────────
+// Milestones are DERIVED from the projection, so a client always gets a useful
+// timeline even when the adviser types nothing. Every entry is a fact of the
+// plan (a birthday that unlocks something, a phase change the engine applies),
+// never an invented commitment. Adviser-entered dates merge in chronologically.
+
+function buildTimeline(state, result, meeting) {
+  const planTo   = result.planToAge ?? 95;
+  const younger  = result.youngerStart;
+  const starts   = result.clientStartAges ?? [];
+  const names    = state.clients.map((c, i) => c.name || `Client ${i + 1}`);
+  const reviewYear = meeting.reviewDate
+    ? new Date(meeting.reviewDate + 'T00:00:00').getFullYear()
+    : new Date().getFullYear();
+
+  if (younger == null || starts.length < 2) return [];
+
+  const items = [];
+  const chartAgeWhen = (i, age) => younger + (age - starts[i]);
+  const agesAt = ca => starts.map(s => s + (ca - younger)).join(' / ');
+
+  function add(chartAge, title, note) {
+    if (chartAge == null || chartAge < younger || chartAge > planTo) return;
+    const y = reviewYear + (chartAge - younger);
+    items.push({ sort: `${y}-06-30`, when: String(y), sub: `ages ${agesAt(chartAge)}`, title, note });
+  }
+
+  const penAge = state.pension?.pensionAge ?? 67;
+  state.clients.forEach((cli, i) => {
+    if (starts[i] < 60) {
+      add(chartAgeWhen(i, 60), `${names[i]}'s super becomes available`,
+        'Age 60 — the earliest super can normally be accessed');
+    }
+    if (starts[i] < cli.freedomAge) {
+      add(chartAgeWhen(i, cli.freedomAge), `${names[i]} stops work`,
+        `Age ${cli.freedomAge} — the retirement age in this plan`);
+    }
+    if (state.pension?.include && starts[i] < penAge) {
+      add(chartAgeWhen(i, penAge), `${names[i]} reaches Age Pension age`,
+        `Age ${penAge} — we lodge the claim about 13 weeks beforehand`);
+    }
+  });
+
+  if (result.pensionStartAge != null) {
+    const amt = result.firstPensionResult?.annualPension;
+    add(result.pensionStartAge, 'Age Pension payments begin',
+      amt ? `Projected around ${money(amt)} in the first year, rising as your own savings are drawn down` : '');
+  }
+
+  const phases = state.shared.incomePhases ?? [];
+  phases.forEach((ph, i) => {
+    const next = phases[i + 1];
+    if (ph.untilAge && next) {
+      add(ph.untilAge, `Spending steps to ${money(next.income)} a year`,
+        "In today's dollars — the projection indexes it with inflation");
+    }
+  });
+
+  if (result.depletionAge != null && result.depletionAge < planTo) {
+    add(result.depletionAge, 'Savings would be running low here',
+      'From this point the Age Pension carries most of your income — this is what the strategies address');
+  }
+
+  add(planTo, 'End of the planning horizon',
+    `We deliberately plan to age ${planTo}, beyond average life expectancy`);
+
+  // Adviser-entered dates keep their exact day
+  for (const d of (meeting.dates ?? [])) {
+    if (!d || !d.title) continue;
+    items.push({ sort: d.date || '9999', when: d.date ? shortDate(d.date) : '', sub: '', title: d.title, note: d.note || '' });
+  }
+
+  items.sort((a, b) => a.sort.localeCompare(b.sort));
+  return items;
+}
+
 // ── year-by-year table (audit DNA, client-sized) ────────────────────────────
 
 function buildYearTable(result) {
@@ -211,7 +287,7 @@ export function buildClientReport({ state, result, sequencingResult = null, solv
 
   // meeting content
   const actions = meeting.actions ?? [];
-  const dates   = (meeting.dates ?? []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  // (adviser dates are merged into the derived timeline by buildTimeline)
   const strategies = meeting.strategies ?? [];
   const callUs  = meeting.callUs ?? [];
 
@@ -224,10 +300,11 @@ export function buildClientReport({ state, result, sequencingResult = null, solv
       </label>
     </li>`).join('');
 
-  const datesHtml = dates.map(d => `
+  const timeline = buildTimeline(state, result, meeting);
+  const timelineHtml = timeline.map(t => `
     <li>
-      <span class="dd">${shortDate(d.date)}</span>
-      <span class="dt">${esc(d.title)}${d.note ? `<em>${esc(d.note)}</em>` : ''}</span>
+      <span class="dd">${esc(t.when)}${t.sub ? `<em>${esc(t.sub)}</em>` : ''}</span>
+      <span class="dt">${esc(t.title)}${t.note ? `<em>${esc(t.note)}</em>` : ''}</span>
     </li>`).join('');
 
   const strategiesHtml = strategies.map(s => `
@@ -307,8 +384,10 @@ export function buildClientReport({ state, result, sequencingResult = null, solv
   .dates ul { list-style:none; }
   .dates li { display:flex; gap:14px; padding:10px 2px; border-bottom:1px solid var(--line); }
   .dates li:last-child { border-bottom:none; }
-  .dd { min-width:96px; font-weight:700; color:var(--navy); font-size:.85rem; }
+  .dd { min-width:104px; font-weight:700; color:var(--navy); font-size:.85rem; }
+  .dd em { display:block; font-weight:400; font-style:normal; color:var(--muted); font-size:.72rem; }
   .dt { flex:1; } .dt em { display:block; color:var(--muted); font-style:normal; font-size:.83rem; }
+  @media (max-width:460px){ .dates li { flex-direction:column; gap:2px; } .dd { min-width:0; } }
   /* strategies */
   .strat { padding:12px 0; border-bottom:1px solid var(--line); }
   .strat:last-child { border-bottom:none; }
@@ -415,9 +494,9 @@ ${meeting.sample ? '<div class="ribbon">SAMPLE</div>' : ''}
     <ul>${actionsHtml}</ul>
   </div>` : ''}
 
-  ${dates.length ? `<div class="card dates">
-    <h2>Dates that matter</h2>
-    <ul>${datesHtml}</ul>
+  ${timeline.length ? `<div class="card dates">
+    <h2>Your timeline ${info('The milestones in your plan — when super becomes available, when work stops, when the Age Pension starts, and anything specific we agreed. Dates come from your plan, not from a calendar of averages.')}</h2>
+    <ul>${timelineHtml}</ul>
   </div>` : ''}
 
   ${callUs.length ? `<div class="card callus">

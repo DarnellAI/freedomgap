@@ -659,7 +659,9 @@ function renderMeetingInputs(state, onChange) {
 
   const help = document.createElement('p');
   help.className = 'help';
-  help.textContent = 'Fill this in during or after the meeting, then use the "Client report" button in the header to download a single HTML page the client can open on their phone — offline, nothing to install. It carries the active scenario\'s projection plus everything below.';
+  help.innerHTML = 'Use the <b>Client report</b> button in the header to download a single HTML page the client can open on their phone — offline, nothing to install. '
+    + 'The timeline builds itself from the projection (work ending, super becoming available, Age Pension starting), so it is always on the page. '
+    + 'The action list below starts with common review items — <b>edit or delete them</b> so they match what you actually agreed.';
   container.appendChild(help);
 
   container.appendChild(makeRow('Practice name (shown as the brand)', textInput(m.practice, v => { m.practice = v; onChange(); })));
@@ -682,8 +684,12 @@ function renderMeetingInputs(state, onChange) {
   });
   if (m.actions.length < 12) container.appendChild(addListBtn('+ Add action', () => { m.actions.push({ text: '', owner: 'client', done: false }); rerender(); }));
 
-  // Key dates
-  container.appendChild(subhead('Dates that matter'));
+  // Key dates — merged into the auto-derived timeline on the client page
+  container.appendChild(subhead('Extra timeline entries (optional)'));
+  const dHelp = document.createElement('p');
+  dHelp.className = 'help';
+  dHelp.textContent = 'The client\'s timeline already includes their plan milestones. Add anything specific here — a policy renewal, the next review, a contribution deadline.';
+  container.appendChild(dHelp);
   m.dates.forEach((d, i) => {
     const row = listRow();
     const dt = dateInput(d.date, v => { d.date = v; onChange(); });

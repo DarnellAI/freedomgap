@@ -64,8 +64,10 @@
   .dates ul { list-style:none; }
   .dates li { display:flex; gap:14px; padding:10px 2px; border-bottom:1px solid var(--line); }
   .dates li:last-child { border-bottom:none; }
-  .dd { min-width:96px; font-weight:700; color:var(--navy); font-size:.85rem; }
+  .dd { min-width:104px; font-weight:700; color:var(--navy); font-size:.85rem; }
+  .dd em { display:block; font-weight:400; font-style:normal; color:var(--muted); font-size:.72rem; }
   .dt { flex:1; } .dt em { display:block; color:var(--muted); font-style:normal; font-size:.83rem; }
+  @media (max-width:460px){ .dates li { flex-direction:column; gap:2px; } .dd { min-width:0; } }
   /* strategies */
   .strat { padding:12px 0; border-bottom:1px solid var(--line); }
   .strat:last-child { border-bottom:none; }
@@ -366,12 +368,8 @@
   </div>
 
   <div class="card dates">
-    <h2>Dates that matter</h2>
+    <h2>Your timeline <button class="i" type="button" data-tip="The milestones in your plan — when super becomes available, when work stops, when the Age Pension starts, and anything specific we agreed. Dates come from your plan, not from a calendar of averages." aria-label="What is this?">i</button></h2>
     <ul>
-    <li>
-      <span class="dd">1 Oct 2026</span>
-      <span class="dt">Margaret turns 67 — Age Pension age<em>we lodge the application 13 weeks before</em></span>
-    </li>
     <li>
       <span class="dd">4 Feb 2027</span>
       <span class="dt">Six-month check-in with Jackson<em>phone call, 30 minutes</em></span>
@@ -381,8 +379,32 @@
       <span class="dt">Last safe day for this year&#39;s super contributions<em>money must reach the fund before 30 June</em></span>
     </li>
     <li>
+      <span class="dd">2027<em>ages 67 / 66</em></span>
+      <span class="dt">David reaches Age Pension age<em>Age 67 — we lodge the claim about 13 weeks beforehand</em></span>
+    </li>
+    <li>
       <span class="dd">30 July 2027</span>
       <span class="dt">Your next annual review</span>
+    </li>
+    <li>
+      <span class="dd">2028<em>ages 68 / 67</em></span>
+      <span class="dt">Margaret reaches Age Pension age<em>Age 67 — we lodge the claim about 13 weeks beforehand</em></span>
+    </li>
+    <li>
+      <span class="dd">2032<em>ages 72 / 71</em></span>
+      <span class="dt">David stops work<em>Age 72 — the retirement age in this plan</em></span>
+    </li>
+    <li>
+      <span class="dd">2032<em>ages 72 / 71</em></span>
+      <span class="dt">Age Pension payments begin<em>Projected around $19,584 in the first year, rising as your own savings are drawn down</em></span>
+    </li>
+    <li>
+      <span class="dd">2036<em>ages 76 / 75</em></span>
+      <span class="dt">Margaret stops work<em>Age 75 — the retirement age in this plan</em></span>
+    </li>
+    <li>
+      <span class="dd">2051<em>ages 91 / 90</em></span>
+      <span class="dt">End of the planning horizon<em>We deliberately plan to age 90, beyond average life expectancy</em></span>
     </li></ul>
   </div>
 

@@ -55,8 +55,9 @@ const meeting = {
     { text: 'Prepare the Age Pension application pack for age 67', owner: 'practice' },
     { text: 'Model the part-pension entitlement while David still works part-time', owner: 'practice', done: true, note: 'done in this review' },
   ],
+  // The client's timeline is derived from the projection automatically; these
+  // are the extras specific to this household.
   dates: [
-    { date: '2026-10-01', title: 'Margaret turns 67 — Age Pension age', note: 'we lodge the application 13 weeks before' },
     { date: '2027-02-04', title: 'Six-month check-in with Jackson', note: 'phone call, 30 minutes' },
     { date: '2027-06-20', title: 'Last safe day for this year\'s super contributions', note: 'money must reach the fund before 30 June' },
     { date: '2027-07-30', title: 'Your next annual review' },

@@ -65,6 +65,29 @@ function migrateState(state) {
     state.meeting = { practice: 'Darnell Consulting', adviser: '', reviewDate: null, intro: '',
                       actions: [], dates: [], strategies: [], callUs: [] };
   }
+  // Seed a starter action list exactly once per scenario, so an export is never
+  // empty for an adviser who has not opened the panel. `seeded` makes this
+  // one-shot: deleting the starters afterwards sticks.
+  if (state.meeting.seeded === undefined) {
+    if (!state.meeting.actions?.length) {
+      state.meeting.actions = [
+        { text: 'Send us your latest super statements so we can keep the plan current', owner: 'client', done: false },
+        { text: 'Check your super is in the investment option we discussed', owner: 'client', done: false },
+        { text: 'Confirm your binding death benefit nomination is current — they lapse every 3 years', owner: 'client', done: false },
+        { text: 'Review these projections and confirm the assumptions with you', owner: 'practice', done: true, note: 'done in this review' },
+      ];
+    }
+    if (!state.meeting.callUs?.length) {
+      state.meeting.callUs = [
+        'Either of you decides to stop work earlier than planned',
+        'You receive an inheritance or a large gift',
+        'You are thinking about a big purchase or helping the kids',
+        'A health event changes what retirement needs to look like',
+        'Markets fall sharply and you are tempted to move to cash',
+      ];
+    }
+    state.meeting.seeded = true;
+  }
   return state;
 }
 
