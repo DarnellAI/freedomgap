@@ -178,6 +178,7 @@ export function renderInputs(state, onChange) {
   renderAgedCareInputs(state, onChange);
   renderSurvivorInputs(state, onChange);
   renderBequestInputs(state, onChange);
+  renderMeetingInputs(state, onChange);
 }
 
 function renderClientInputs(idx, state, onChange) {
@@ -598,6 +599,127 @@ function renderSurvivorInputs(state, onChange) {
   help.textContent = 'On partner death, super balances merge to survivor within Transfer Balance Cap. Expenses reduce to the set percentage.';
   rows.push(help);
   rows.forEach(r => container.appendChild(r));
+}
+
+// ── Client take-home report (meeting record) ─────────────────────────────────
+// Captures the non-calculated content of the review — what was agreed, who is
+// doing what, dates, call-us triggers — for the exported client page.
+// None of this affects the projection.
+
+function smallBtn(label, title, onClick) {
+  const b = document.createElement('button');
+  b.textContent = label;
+  b.title = title;
+  b.style.cssText = 'padding:.2rem .55rem;border:1px solid #fca5a5;border-radius:.4rem;font-size:.75rem;cursor:pointer;color:#dc2626;background:none;flex-shrink:0;';
+  b.addEventListener('click', onClick);
+  return b;
+}
+function lineInput(value, placeholder, onInput, flex = '1') {
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = value ?? '';
+  inp.placeholder = placeholder;
+  inp.style.cssText = `flex:${flex};min-width:0;padding:.3rem .5rem;border:1px solid var(--border);border-radius:.4rem;font-size:.82rem;background:var(--cream);color:var(--ink);`;
+  inp.addEventListener('input', () => onInput(inp.value));
+  return inp;
+}
+function areaInput(value, placeholder, onInput) {
+  const ta = document.createElement('textarea');
+  ta.value = value ?? '';
+  ta.placeholder = placeholder;
+  ta.rows = 2;
+  ta.style.cssText = 'width:100%;padding:.35rem .55rem;border:1px solid var(--border);border-radius:.4rem;font-size:.82rem;background:var(--cream);color:var(--ink);resize:vertical;font-family:inherit;';
+  ta.addEventListener('input', () => onInput(ta.value));
+  return ta;
+}
+function listRow() {
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;';
+  return row;
+}
+function addListBtn(label, onClick) {
+  const b = document.createElement('button');
+  b.className = 'scenario-add';
+  b.style.cssText = 'margin-top:.2rem;align-self:flex-start;';
+  b.textContent = label;
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+function renderMeetingInputs(state, onChange) {
+  const container = document.getElementById('meetingInputs');
+  if (!container) return;
+  if (!state.meeting) {
+    state.meeting = { practice: 'Darnell Consulting', adviser: '', reviewDate: null, intro: '',
+                      actions: [], dates: [], strategies: [], callUs: [] };
+  }
+  const m = state.meeting;
+  container.innerHTML = '';
+  const rerender = () => { renderMeetingInputs(state, onChange); onChange(); };
+
+  const help = document.createElement('p');
+  help.className = 'help';
+  help.textContent = 'Fill this in during or after the meeting, then use the "Client report" button in the header to download a single HTML page the client can open on their phone — offline, nothing to install. It carries the active scenario\'s projection plus everything below.';
+  container.appendChild(help);
+
+  container.appendChild(makeRow('Practice name (shown as the brand)', textInput(m.practice, v => { m.practice = v; onChange(); })));
+  container.appendChild(makeRow('Adviser first name (used in the copy)', textInput(m.adviser, v => { m.adviser = v; onChange(); })));
+  container.appendChild(makeRow('Review date (defaults to today)', dateInput(m.reviewDate, v => { m.reviewDate = v; onChange(); })));
+
+  container.appendChild(subhead('Personal note at the top of the page'));
+  container.appendChild(areaInput(m.intro, 'e.g. Thanks for coming in this week — this page is the plan we walked through together.', v => { m.intro = v; onChange(); }));
+
+  // Actions
+  container.appendChild(subhead('Action list — who is doing what'));
+  m.actions.forEach((a, i) => {
+    const row = listRow();
+    row.appendChild(lineInput(a.text, 'Action…', v => { a.text = v; onChange(); }));
+    row.appendChild(selectInput([['client', 'Client'], ['practice', 'Us']], a.owner ?? 'client', v => { a.owner = v; onChange(); }));
+    const doneWrap = checkInput(a.done, v => { a.done = v; onChange(); }, 'done');
+    row.appendChild(doneWrap);
+    row.appendChild(smallBtn('✕', 'Remove action', () => { m.actions.splice(i, 1); rerender(); }));
+    container.appendChild(row);
+  });
+  if (m.actions.length < 12) container.appendChild(addListBtn('+ Add action', () => { m.actions.push({ text: '', owner: 'client', done: false }); rerender(); }));
+
+  // Key dates
+  container.appendChild(subhead('Dates that matter'));
+  m.dates.forEach((d, i) => {
+    const row = listRow();
+    const dt = dateInput(d.date, v => { d.date = v; onChange(); });
+    dt.style.width = '9.2rem';
+    row.appendChild(dt);
+    row.appendChild(lineInput(d.title, 'What happens…', v => { d.title = v; onChange(); }));
+    row.appendChild(lineInput(d.note, 'note (optional)', v => { d.note = v; onChange(); }, '0 1 10rem'));
+    row.appendChild(smallBtn('✕', 'Remove date', () => { m.dates.splice(i, 1); rerender(); }));
+    container.appendChild(row);
+  });
+  if (m.dates.length < 10) container.appendChild(addListBtn('+ Add date', () => { m.dates.push({ date: '', title: '', note: '' }); rerender(); }));
+
+  // Strategies
+  container.appendChild(subhead('What we agreed — strategies'));
+  m.strategies.forEach((s, i) => {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'border-top:1px solid var(--border);padding-top:.5rem;display:flex;flex-direction:column;gap:.35rem;';
+    const head = listRow();
+    head.appendChild(lineInput(s.title, 'Strategy title…', v => { s.title = v; onChange(); }));
+    head.appendChild(smallBtn('✕', 'Remove strategy', () => { m.strategies.splice(i, 1); rerender(); }));
+    wrap.appendChild(head);
+    wrap.appendChild(areaInput(s.body, 'One or two sentences on what it is and why it helps…', v => { s.body = v; onChange(); }));
+    wrap.appendChild(lineInput(s.impact, 'Impact chip, e.g. "≈ $500k more at retirement" (optional)', v => { s.impact = v; onChange(); }));
+    container.appendChild(wrap);
+  });
+  if (m.strategies.length < 8) container.appendChild(addListBtn('+ Add strategy', () => { m.strategies.push({ title: '', body: '', impact: '' }); rerender(); }));
+
+  // Call us triggers
+  container.appendChild(subhead('“Call us before deciding, if…”'));
+  m.callUs.forEach((c, i) => {
+    const row = listRow();
+    row.appendChild(lineInput(c, 'e.g. You receive an inheritance or a large gift', v => { m.callUs[i] = v; onChange(); }));
+    row.appendChild(smallBtn('✕', 'Remove', () => { m.callUs.splice(i, 1); rerender(); }));
+    container.appendChild(row);
+  });
+  if (m.callUs.length < 10) container.appendChild(addListBtn('+ Add trigger', () => { m.callUs.push(''); rerender(); }));
 }
 
 function renderBequestInputs(state, onChange) {

@@ -1,5 +1,6 @@
 import { DEFAULT_STATE, PENSION, SCENARIO_COLORS, SCENARIO_NAMES, MAX_SCENARIOS, RETURN_PROFILES } from './data/parameters.js';
 import { runProjection, solveSavingsGap } from './calc/core.js';
+import { buildClientReport } from './export/clientReport.js';
 import { safeEarnAmount } from './calc/pension.js';
 import { initChart, updateChart, initDebtChart, updateDebtChart } from './ui/chart.js';
 import { renderInputs } from './ui/inputs.js';
@@ -59,6 +60,11 @@ function migrateState(state) {
     if (cl.birthMonth === undefined) cl.birthMonth = null;
   });
   if (state.shared.planDate === undefined) state.shared.planDate = null;
+  // Meeting record for the client take-home report
+  if (!state.meeting) {
+    state.meeting = { practice: 'Darnell Consulting', adviser: '', reviewDate: null, intro: '',
+                      actions: [], dates: [], strategies: [], callUs: [] };
+  }
   return state;
 }
 
@@ -906,6 +912,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('exportBtn').addEventListener('click', () => exportJSON(scenarios));
   document.getElementById('exportWorkingsBtn').addEventListener('click', () => exportWorkingsXLSX());
+
+  // Client take-home report — one self-contained HTML file for the ACTIVE scenario
+  document.getElementById('takeHomeBtn').addEventListener('click', () => {
+    const sc     = activeScenario();
+    const state  = sc.state;
+    const result = runProjection(state);
+    const seq    = sc.showSequencing ? runProjection(state, true) : null;
+    const solver = solveSavingsGap(state, 'sustain');
+    const meeting = { ...(state.meeting ?? {}) };
+    if (!meeting.reviewDate) meeting.reviewDate = new Date().toISOString().slice(0, 10);
+    const html = buildClientReport({ state, result, sequencingResult: seq, solver, meeting });
+    const blob = new Blob([html], { type: 'text/html' });
+    const a    = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
+    const slug = state.clients.map(c => (c.name || 'client').toLowerCase().replace(/[^a-z0-9]+/g, '')).join('-');
+    a.download = `take-home-${slug || 'client'}.html`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
 
   document.getElementById('importBtn').addEventListener('click', () => {
     importJSON(imported => {
