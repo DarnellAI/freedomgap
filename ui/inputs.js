@@ -1,7 +1,7 @@
 // Input sidebar renderer — Darnell brand, collapsible sections
 
-import { RETURN_PROFILES } from '../data/parameters.js?v=202607301634';
-import { calcNetIncome } from '../calc/tax.js?v=202607301634';
+import { RETURN_PROFILES } from '../data/parameters.js?v=202607301638';
+import { calcNetIncome } from '../calc/tax.js?v=202607301638';
 
 function dollar(v)  { return v == null ? '' : Math.round(v).toString(); }
 function age(v)     { return v == null ? '' : Math.round(v).toString(); }
@@ -169,16 +169,44 @@ function dateInput(value, onInput) {
  * @param {Function} onChange - Called whenever any value changes; triggers recalc
  */
 export function renderInputs(state, onChange) {
-  renderClientInputs(0, state, onChange);
-  renderClientInputs(1, state, onChange);
-  renderSharedInputs(state, onChange);
-  renderDebtInputs(state, onChange);
-  renderInheritanceInputs(state, onChange);
-  renderPensionInputs(state, onChange);
-  renderAgedCareInputs(state, onChange);
-  renderSurvivorInputs(state, onChange);
-  renderBequestInputs(state, onChange);
-  renderMeetingInputs(state, onChange);
+  // Each section is isolated: a failure in one shows its own error in place
+  // rather than silently leaving a blank panel (or killing the sections after
+  // it), which is impossible to diagnose from the outside.
+  safeRender('client 1',    () => renderClientInputs(0, state, onChange), `[data-client="0"]`);
+  safeRender('client 2',    () => renderClientInputs(1, state, onChange), `[data-client="1"]`);
+  safeRender('shared',      () => renderSharedInputs(state, onChange),      '#sharedInputs');
+  safeRender('debts',       () => renderDebtInputs(state, onChange),        '#debtInputs');
+  safeRender('inheritance', () => renderInheritanceInputs(state, onChange), '#inheritanceInputs');
+  safeRender('pension',     () => renderPensionInputs(state, onChange),     '#pensionInputs');
+  safeRender('aged care',   () => renderAgedCareInputs(state, onChange),    '#agedCareInputs');
+  safeRender('survivor',    () => renderSurvivorInputs(state, onChange),    '#survivorInputs');
+  safeRender('estate',      () => renderBequestInputs(state, onChange),     '#bequestInputs');
+  safeRender('take-home',   () => renderMeetingInputs(state, onChange),     '#meetingInputs');
+}
+
+function safeRender(label, fn, selector) {
+  function note(text) {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    const box = document.createElement('div');
+    box.style.cssText = 'border:1px solid #fca5a5;background:#fef2f2;color:#991b1b;border-radius:.5rem;padding:.6rem .7rem;font-size:.75rem;line-height:1.5;';
+    box.textContent = text;
+    el.appendChild(box);
+  }
+  try {
+    fn();
+  } catch (err) {
+    console.error(`[freedomgap] "${label}" panel failed to render:`, err);
+    note(`This section could not be displayed: ${err && err.message ? err.message : err}`);
+    return;
+  }
+  // A panel that produces nothing is a bug too, and indistinguishable from a
+  // rendering failure once it is on screen — say so rather than show a blank.
+  const el = document.querySelector(selector);
+  if (el && el.children.length === 0) {
+    console.warn(`[freedomgap] "${label}" panel rendered no content`);
+    note(`This section rendered no content (${label}). Please report this — a hard refresh with Ctrl+Shift+R is worth trying first.`);
+  }
 }
 
 function renderClientInputs(idx, state, onChange) {
@@ -649,11 +677,24 @@ function addListBtn(label, onClick) {
 function renderMeetingInputs(state, onChange) {
   const container = document.getElementById('meetingInputs');
   if (!container) return;
-  if (!state.meeting) {
-    state.meeting = { practice: 'Darnell Consulting', adviser: '', reviewDate: null, intro: '',
-                      actions: [], dates: [], strategies: [], callUs: [] };
-  }
+  // Normalise defensively: this record can arrive from localStorage written by
+  // an older build, from an imported JSON file, or from Reset/Load example
+  // (neither of which runs the migration), so no key can be assumed present or
+  // of the right type.
+  if (!state.meeting || typeof state.meeting !== 'object') state.meeting = {};
   const m = state.meeting;
+  if (typeof m.practice !== 'string') m.practice = 'Darnell Consulting';
+  if (typeof m.adviser  !== 'string') m.adviser = '';
+  if (typeof m.intro    !== 'string') m.intro = '';
+  if (m.reviewDate === undefined) m.reviewDate = null;
+  for (const k of ['actions', 'dates', 'strategies', 'callUs']) {
+    if (!Array.isArray(m[k])) m[k] = [];
+  }
+  m.actions    = m.actions.filter(a => a && typeof a === 'object');
+  m.dates      = m.dates.filter(d => d && typeof d === 'object');
+  m.strategies = m.strategies.filter(s => s && typeof s === 'object');
+  m.callUs     = m.callUs.map(c => (typeof c === 'string' ? c : String(c ?? '')));
+
   container.innerHTML = '';
   const rerender = () => { renderMeetingInputs(state, onChange); onChange(); };
 
@@ -664,10 +705,12 @@ function renderMeetingInputs(state, onChange) {
     + 'The action list below starts with common review items — <b>edit or delete them</b> so they match what you actually agreed.';
   container.appendChild(help);
 
-  if (!m.brand) m.brand = { preset: 'darnell', people: [], contact: {} };
+  if (!m.brand || typeof m.brand !== 'object') m.brand = { preset: 'darnell' };
   const br = m.brand;
-  if (!br.people) br.people = [];
-  if (!br.contact) br.contact = {};
+  if (typeof br.preset !== 'string') br.preset = 'darnell';
+  if (!Array.isArray(br.people)) br.people = [];
+  br.people = br.people.filter(p => p && typeof p === 'object');
+  if (!br.contact || typeof br.contact !== 'object') br.contact = {};
 
   container.appendChild(subhead('Branding'));
   container.appendChild(makeRow('Colour theme (white-labels the whole report)',

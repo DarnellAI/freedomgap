@@ -1,4 +1,4 @@
-import { SUPER, MIN_DRAWDOWN } from '../data/parameters.js?v=202607301634';
+import { SUPER, MIN_DRAWDOWN } from '../data/parameters.js?v=202607301638';
 
 // ── Australian income tax 2025-26 (revised Stage 3 rates, effective 1 Jul 2024) ─
 const BRACKETS = [

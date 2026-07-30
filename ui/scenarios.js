@@ -1,6 +1,6 @@
 // Scenario tab management — up to 5 scenarios, localStorage persistence
 
-import { MAX_SCENARIOS, SCENARIO_COLORS, SCENARIO_NAMES, DEFAULT_STATE } from '../data/parameters.js?v=202607301634';
+import { MAX_SCENARIOS, SCENARIO_COLORS, SCENARIO_NAMES, DEFAULT_STATE } from '../data/parameters.js?v=202607301638';
 
 const LS_KEY = 'freedomgap_scenarios_v2';
 

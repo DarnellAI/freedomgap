@@ -1,4 +1,4 @@
-import { PENSION, PENSION_INDEXATION } from '../data/parameters.js?v=202607301634';
+import { PENSION, PENSION_INDEXATION } from '../data/parameters.js?v=202607301638';
 
 /**
  * Calculate annual Age Pension.
